@@ -103,7 +103,7 @@ export default async function ModulesPage({ params, searchParams }: PageProps<"/
                 {moduleItems.map((item) =>
                   item.item_type === "header" ? (
                     <li key={item.id} className="flex items-center justify-between bg-white px-5 pb-1 pt-4">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.title}</span>
+                      <span className="text-[13px] font-bold text-slate-500">{item.title}</span>
                       {isStaff ? <RemoveItem courseId={course.id} id={item.id} label={t.modules.remove} /> : null}
                     </li>
                   ) : (

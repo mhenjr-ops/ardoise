@@ -10,36 +10,24 @@ export function NavLink({
   children,
   exact = false,
   variant = "course",
+  icon,
 }: {
   href: string;
   children: ReactNode;
   exact?: boolean;
   variant?: "course" | "global" | "tab";
+  icon?: ReactNode;
 }) {
   const pathname = usePathname();
   const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
-  if (variant === "global") {
+  if (variant === "tab" || variant === "global") {
     return (
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
-        className={`flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium ${
-          active ? "bg-white/10 text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"
-        }`}
-      >
-        {children}
-      </Link>
-    );
-  }
-
-  if (variant === "tab") {
-    return (
-      <Link
-        href={href}
-        aria-current={active ? "page" : undefined}
-        className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm ${
-          active ? "border-brand-600 font-semibold text-brand-700" : "border-transparent text-slate-600 hover:text-slate-900"
+        className={`relative whitespace-nowrap rounded-full px-3.5 py-1.5 text-[14.5px] font-semibold transition-colors ${
+          active ? "bg-ardoise text-chalk" : "text-slate-600 hover:bg-slate-900/5 hover:text-slate-900"
         }`}
       >
         {children}
@@ -51,12 +39,11 @@ export function NavLink({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`block whitespace-nowrap border-b-2 px-3 py-2 text-sm md:border-b-0 md:border-l-2 ${
-        active
-          ? "border-brand-600 font-semibold text-brand-700"
-          : "border-transparent text-slate-600 hover:text-slate-900"
+      className={`flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2 text-[14.5px] font-semibold transition-colors ${
+        active ? "bg-paper text-slate-900 shadow-[0_1px_0_rgb(31_59_54/0.06)] ring-1 ring-slate-200" : "text-slate-600 hover:bg-slate-900/[0.04] hover:text-slate-900"
       }`}
     >
+      {icon ? <span className={active ? "text-ochre-600" : "text-slate-400"}>{icon}</span> : null}
       {children}
     </Link>
   );

@@ -42,6 +42,10 @@ export default async function AssignmentsPage({ params, searchParams }: PageProp
       ? supabase.from("question_banks").select("id, title").eq("course_id", course.id).order("created_at")
       : Promise.resolve({ data: [] }),
   ]);
+  const { data: rubricRows } = isStaff
+    ? await supabase.from("rubrics").select("id, title").eq("course_id", course.id).order("title")
+    : { data: [] };
+  const rubricList = (rubricRows ?? []) as Array<{ id: string; title: string }>;
   // A submitted quiz attempt counts as a submission.
   const submissionRows = [
     ...((subs ?? []) as Array<{ assignment_id: string; student_id: string }>),
@@ -59,7 +63,7 @@ export default async function AssignmentsPage({ params, searchParams }: PageProp
         <Disclosure summary={t.assignments.newAssignment}>
           <form action={createAssignment} className="space-y-4">
             <input type="hidden" name="course_id" value={course.id} />
-            <AssignmentFields t={t} />
+            <AssignmentFields t={t} rubrics={rubricList} />
             {(modules ?? []).length ? (
               <Field label={`${t.course.modules} (${t.common.optional})`}>
                 <Select name="module_id" defaultValue="">
@@ -83,7 +87,7 @@ export default async function AssignmentsPage({ params, searchParams }: PageProp
             <p className="text-sm text-slate-600">
               {t.quiz.noBanks}{" "}
               <a href={`/courses/${course.id}/quizzes`} className="font-medium text-brand-700 hover:underline">
-                {t.quiz.banks} →
+                {t.quiz.banks}
               </a>
             </p>
           ) : (

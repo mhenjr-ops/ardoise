@@ -4,7 +4,8 @@ import { getCourseContext } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
 import { formatScore } from "@/lib/format";
 import { toTwenty, weightedAverage } from "@/lib/grades";
-import { Badge, Card, Empty, buttonClass } from "@/components/ui";
+import { Card, Empty, buttonClass } from "@/components/ui";
+import { WhatIfGrades } from "@/components/grading/what-if";
 import type { Assignment, Grade } from "@/lib/types";
 
 type StudentRow = { user_id: string; profile: { full_name: string; email: string } | { full_name: string; email: string }[] | null };
@@ -30,48 +31,34 @@ export default async function GradesPage({ params }: PageProps<"/courses/[course
   if (assignments.length === 0) return <Empty>{t.grades.noGrades}</Empty>;
 
   if (!isStaff) {
-    const average = weightedAverage(assignments, grades, user.id);
+    const rows = assignments.map((a) => {
+      const g = grades.find((row) => row.assignment_id === a.id && row.student_id === user.id);
+      return {
+        id: a.id,
+        href: `/courses/${course.id}/assignments/${a.id}`,
+        title: a.title,
+        component: t.assignments.components[a.component],
+        weight: Number(a.weight),
+        points: Number(a.points_possible),
+        score: g && g.score !== null ? Number(g.score) : null,
+        comment: g?.comment ?? null,
+      };
+    });
     return (
-      <div className="space-y-4">
-        <Card className="flex items-center justify-between p-5">
-          <div>
-            <p className="text-sm font-medium text-slate-600">{t.grades.average}</p>
-            <p className="text-xs text-slate-400">{t.grades.weightNote}</p>
-          </div>
-          <p className="text-3xl font-semibold text-slate-900">
-            {formatScore(locale, average)}
-            <span className="text-base font-normal text-slate-500">{t.grades.outOf20}</span>
-          </p>
-        </Card>
-        <Card className="overflow-hidden">
-          <ul className="divide-y divide-slate-100">
-            {assignments.map((a) => {
-              const g = grades.find((row) => row.assignment_id === a.id && row.student_id === user.id);
-              return (
-                <li key={a.id} className="px-5 py-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <Link href={`/courses/${course.id}/assignments/${a.id}`} className="font-medium text-slate-900 hover:text-brand-700">
-                        {a.title}
-                      </Link>
-                      <div className="mt-1 flex gap-2">
-                        <Badge tone="brand">{t.assignments.components[a.component]}</Badge>
-                        <Badge>×{formatScore(locale, a.weight)}</Badge>
-                      </div>
-                    </div>
-                    <span className="text-sm font-semibold text-slate-900">
-                      {g && g.score !== null
-                        ? `${formatScore(locale, g.score)} / ${formatScore(locale, a.points_possible)}`
-                        : t.grades.notGraded}
-                    </span>
-                  </div>
-                  {g?.comment ? <p className="prose-lite mt-2 text-sm text-slate-600">{g.comment}</p> : null}
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      </div>
+      <WhatIfGrades
+        rows={rows}
+        locale={locale}
+        labels={{
+          average: t.whatif.current,
+          projected: t.whatif.projected,
+          note: t.grades.weightNote,
+          title: t.whatif.title,
+          help: t.whatif.help,
+          reset: t.whatif.reset,
+          notGraded: t.grades.notGraded,
+          feedback: t.assignments.feedback,
+        }}
+      />
     );
   }
 
@@ -119,12 +106,12 @@ export default async function GradesPage({ params }: PageProps<"/courses/[course
                 const avg = weightedAverage(assignments, grades, s.id);
                 return (
                   <tr key={s.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
-                    <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-2.5 font-medium text-slate-800">{s.name}</td>
+                    <td className="sticky left-0 z-10 whitespace-nowrap bg-paper px-4 py-2.5 font-medium text-slate-800">{s.name}</td>
                     {assignments.map((a) => {
                       const g = grades.find((row) => row.assignment_id === a.id && row.student_id === s.id);
                       const low = g && g.score !== null && toTwenty(Number(g.score), Number(a.points_possible)) < 10;
                       return (
-                        <td key={a.id} className={`px-3 py-2.5 tabular-nums ${low ? "text-red-600" : "text-slate-700"}`}>
+                        <td key={a.id} className={`px-3 py-2.5 num ${low ? "font-bold text-terracotta-600" : "text-slate-700"}`}>
                           <Link href={`/courses/${course.id}/assignments/${a.id}/grade?student=${s.id}`} className="block hover:underline">
                             {g && g.score !== null ? formatScore(locale, g.score) : "–"}
                           </Link>
@@ -132,7 +119,7 @@ export default async function GradesPage({ params }: PageProps<"/courses/[course
                       );
                     })}
                     <td
-                      className={`px-4 py-2.5 text-right font-semibold tabular-nums ${
+                      className={`px-4 py-2.5 text-right num font-display text-[16px] font-semibold ${
                         avg !== null && avg < 10 ? "text-red-600" : "text-slate-900"
                       }`}
                     >

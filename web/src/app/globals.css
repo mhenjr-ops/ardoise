@@ -1,17 +1,143 @@
 @import "tailwindcss";
 
+/*
+ * Terroir — the Ardoise design system.
+ * Slate (ardoise) is the board, chalk is what we write on it, ochre marks
+ * what matters now, terracotta warns, Ndop indigo informs.
+ * Existing utility names (brand-*, slate-*, red-*, amber-*, sky-*) are
+ * remapped here so every screen picks up the palette.
+ */
 @theme {
-  --color-brand-50: #e8f5f1;
-  --color-brand-100: #c7e8de;
-  --color-brand-200: #94d2c0;
-  --color-brand-500: #12907a;
-  --color-brand-600: #0e7c66;
-  --color-brand-700: #0b6352;
-  --color-brand-800: #094d40;
-  --color-slate-board: #16202c;
-  --color-chalk: #f7f3e8;
-  --color-chalk-yellow: #f2c14e;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Type */
+  --font-sans: "Alegreya Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: "Alegreya Variable", "Alegreya", Georgia, "Times New Roman", serif;
+
+  /* Ardoise — slate green, the brand */
+  --color-brand-50: #eef4f1;
+  --color-brand-100: #d7e5df;
+  --color-brand-200: #afcac0;
+  --color-brand-300: #82a89c;
+  --color-brand-400: #5a857a;
+  --color-brand-500: #3d685e;
+  --color-brand-600: #2a4d45;
+  --color-brand-700: #1f3b36;
+  --color-brand-800: #172d29;
+  --color-brand-900: #10201d;
+  --color-ardoise: #1f3b36;
+  --color-ardoise-deep: #162b27;
+
+  /* Chalk and sand — paper, surfaces and warm neutrals */
+  --color-chalk: #f8f3ea;
+  --color-paper: #fffcf6;
+  --color-sand: #f4ede1;
+  --color-slate-50: #faf6ef;
+  --color-slate-100: #f1e9dc;
+  --color-slate-200: #e5d9c6;
+  --color-slate-300: #d2c3ab;
+  --color-slate-400: #a8977d;
+  --color-slate-500: #7a6c58;
+  --color-slate-600: #5c5143;
+  --color-slate-700: #453d33;
+  --color-slate-800: #2e2922;
+  --color-slate-900: #1d1a15;
+  --color-slate-950: #12100c;
+
+  /* Ochre — accent, progress, what needs attention */
+  --color-ochre-50: #fdf6e6;
+  --color-ochre-100: #f9e7bd;
+  --color-ochre-200: #f2cd7c;
+  --color-ochre-300: #ebb340;
+  --color-ochre-400: #e39e17;
+  --color-ochre-500: #d98e04;
+  --color-ochre-600: #b57503;
+  --color-ochre-700: #8d5b07;
+  --color-ochre-800: #6b460b;
+  --color-amber-50: #fdf6e6;
+  --color-amber-100: #f9e7bd;
+  --color-amber-200: #f2cd7c;
+  --color-amber-300: #ebb340;
+  --color-amber-400: #e39e17;
+  --color-amber-500: #d98e04;
+  --color-amber-600: #b57503;
+  --color-amber-700: #8d5b07;
+  --color-amber-800: #6b460b;
+  --color-amber-900: #4d330b;
+
+  /* Terracotta — errors, resits, destructive actions */
+  --color-terracotta-50: #fbefe9;
+  --color-terracotta-100: #f5d7ca;
+  --color-terracotta-200: #ebb099;
+  --color-terracotta-300: #dd8865;
+  --color-terracotta-400: #c96a41;
+  --color-terracotta-500: #b4532a;
+  --color-terracotta-600: #95421f;
+  --color-terracotta-700: #74341b;
+  --color-red-50: #fbefe9;
+  --color-red-100: #f5d7ca;
+  --color-red-200: #ebb099;
+  --color-red-300: #dd8865;
+  --color-red-400: #c96a41;
+  --color-red-500: #b4532a;
+  --color-red-600: #a1461f;
+  --color-red-700: #8a3a1c;
+  --color-red-800: #6c2e18;
+  --color-red-900: #4d2112;
+
+  /* Ndop indigo — information */
+  --color-indigo-50: #eef0f8;
+  --color-indigo-100: #d9def0;
+  --color-indigo-200: #b2bcdf;
+  --color-indigo-500: #3f509a;
+  --color-indigo-600: #33437f;
+  --color-indigo-700: #283669;
+  --color-indigo-800: #1e2a52;
+  --color-sky-50: #eef0f8;
+  --color-sky-100: #d9def0;
+  --color-sky-200: #b2bcdf;
+  --color-sky-500: #3f509a;
+  --color-sky-600: #33437f;
+  --color-sky-700: #283669;
+  --color-sky-800: #1e2a52;
+
+  /* Leaf — passed, present, done */
+  --color-leaf-50: #ecf5ec;
+  --color-leaf-100: #d2e8d2;
+  --color-leaf-500: #3c8a4a;
+  --color-leaf-600: #2f7340;
+  --color-leaf-700: #255c34;
+
+  /* Alegreya Sans runs small: nudge the small sizes up for legibility */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.2rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.4rem;
+
+  --radius-card: 1rem;
+  --shadow-lift: 0 1px 0 rgb(31 59 54 / 0.04), 0 12px 32px -18px rgb(31 59 54 / 0.35);
+  --shadow-float: 0 24px 60px -24px rgb(22 43 39 / 0.45);
+
+  --animate-chalk: chalk 2.4s cubic-bezier(0.65, 0, 0.35, 1) both;
+  --animate-rise: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes chalk {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 html {
@@ -19,14 +145,50 @@ html {
 }
 
 body {
-  background: #f6f7f9;
-  color: #0f172a;
+  background: var(--color-sand);
+  color: var(--color-slate-900);
   font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  font-feature-settings: "kern", "liga";
+}
+
+/* Serif display type for page titles and big numbers */
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+/* Marks and averages line up in tables */
+.num {
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 /* Readable long-form text for pages, announcements and descriptions */
 .prose-lite {
   white-space: pre-wrap;
-  line-height: 1.65;
+  line-height: 1.7;
   overflow-wrap: anywhere;
+  max-width: 72ch;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ochre-500);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-ochre-200);
+  color: var(--color-slate-900);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

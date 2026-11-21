@@ -37,6 +37,7 @@ export async function createAssignment(formData: FormData) {
       component,
       published,
       submission_types: types.length ? types : ["text", "file"],
+      rubric_id: String(formData.get("rubric_id") ?? "") || null,
     })
     .select("id")
     .single();

@@ -59,3 +59,21 @@ export function isPast(iso: string | null | undefined): boolean {
 export function nowIso(): string {
   return new Date().toISOString();
 }
+
+/** Current time in ms (kept out of components so renders stay pure). */
+export function nowMs(): number {
+  return Date.now();
+}
+
+export function formatBytes(locale: Locale, bytes: number): string {
+  const units = ["o", "Ko", "Mo", "Go"];
+  const unitsEn = ["B", "KB", "MB", "GB"];
+  let v = bytes;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  const n = new Intl.NumberFormat(locale === "fr" ? "fr-FR" : "en-GB", { maximumFractionDigits: i ? 1 : 0 }).format(v);
+  return `${n} ${(locale === "fr" ? units : unitsEn)[i]}`;
+}

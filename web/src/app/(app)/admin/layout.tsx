@@ -10,7 +10,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       <PageHeader title={t.admin.title} subtitle={institution.name} />
       {isAdminOrRegistrar ? (
         <>
-          <nav className="-mx-4 mb-6 flex overflow-x-auto border-b border-slate-200 px-4 md:mx-0 md:px-0">
+          <nav className="-mx-4 mb-7 flex gap-1 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
             <NavLink href="/admin" exact variant="tab">
               {t.lmd.nav.overview}
             </NavLink>

@@ -35,3 +35,36 @@ export async function saveGrade(formData: FormData) {
   const target = formData.get("intent") === "next" && nextStudent ? nextStudent : studentId;
   redirect(`${base}?student=${target}&ok=1`);
 }
+
+/** Scores the assignment's rubric; the database turns it into the mark. */
+export async function saveRubricGrade(formData: FormData) {
+  const courseId = String(formData.get("course_id") ?? "");
+  const assignmentId = String(formData.get("assignment_id") ?? "");
+  const studentId = String(formData.get("student_id") ?? "");
+  const nextStudent = String(formData.get("next_student") ?? "");
+  const comment = String(formData.get("comment") ?? "").trim();
+  const base = `/courses/${courseId}/assignments/${assignmentId}/grade`;
+
+  const ratings: Record<string, { level: string; comment?: string }> = {};
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("crit_") && typeof value === "string" && value) {
+      const id = key.slice(5);
+      const c = String(formData.get(`comment_${id}`) ?? "").trim();
+      ratings[id] = c ? { level: value, comment: c } : { level: value };
+    }
+  }
+
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("save_rubric_assessment", {
+    p_assignment: assignmentId,
+    p_student: studentId,
+    p_ratings: ratings,
+    p_comment: comment || null,
+  });
+  if (error) redirect(`${base}?student=${studentId}&error=${error.message.includes("forbidden") ? "forbidden" : "invalid"}`);
+
+  revalidatePath(base);
+  revalidatePath(`/courses/${courseId}/grades`);
+  const target = formData.get("intent") === "next" && nextStudent ? nextStudent : studentId;
+  redirect(`${base}?student=${target}&ok=1`);
+}

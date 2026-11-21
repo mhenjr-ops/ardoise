@@ -1,11 +1,16 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { CalendarClock, ClipboardCheck } from "lucide-react";
+import { CalendarClock, ClipboardCheck, MapPin } from "lucide-react";
 import { requireInstitution } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
-import { daysFromNowIso, formatDateTime, isPast } from "@/lib/format";
-import { Badge, Card, CardHeader, Empty, PageHeader } from "@/components/ui";
-import type { Assignment, Course, CourseRole } from "@/lib/types";
+import { fmt } from "@/lib/i18n/messages-engage";
+import { daysFromNowIso, formatScore, nowMs } from "@/lib/format";
+import { weightedAverage } from "@/lib/grades";
+import { addDays, daysUntil, EVENT_COLORS, expandEvents, formatDayLabel, formatTime, watDayKey, watDayStart } from "@/lib/calendar";
+import { notificationText, timeAgo } from "@/lib/notifications";
+import { Card, CardHeader, Empty, Stat } from "@/components/ui";
+import { CourseCard } from "@/components/course/course-card";
+import type { AppNotification, CalendarEvent, Course, CourseRole } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -13,12 +18,15 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 type EnrollmentRow = { role: CourseRole; course: Course | Course[] | null };
+type Item = { id: string; course_id: string; title: string; due_at: string | null; points_possible: number; weight: number; published: boolean };
 
 export default async function DashboardPage() {
   const [{ supabase, user, institution, isAdminOrRegistrar, profile }, { t, locale }] = await Promise.all([
     requireInstitution(),
     getI18n(),
   ]);
+  const now = nowMs();
+  const today = watDayKey(now);
 
   const { data: enrollmentRows } = await supabase
     .from("enrollments")
@@ -30,8 +38,6 @@ export default async function DashboardPage() {
     const course = Array.isArray(row.course) ? row.course[0] : row.course;
     if (course) byId.set(course.id, { course, role: row.role });
   }
-
-  // Admins and registrars also see every course of their institution.
   if (isAdminOrRegistrar) {
     const { data: allCourses } = await supabase
       .from("courses")
@@ -42,143 +48,237 @@ export default async function DashboardPage() {
       if (!byId.has(course.id)) byId.set(course.id, { course, role: "admin" });
     }
   }
-
   const cards = [...byId.values()].sort((a, b) => a.course.code.localeCompare(b.course.code));
-  const studentCourseIds = cards.filter((c) => c.role === "student").map((c) => c.course.id);
-  const staffCourseIds = cards.filter((c) => c.role !== "student").map((c) => c.course.id);
+  const courseIds = cards.map((c) => c.course.id);
+  const studentIds = cards.filter((c) => c.role === "student").map((c) => c.course.id);
+  const staffIds = cards.filter((c) => c.role !== "student").map((c) => c.course.id);
 
-  // Student to-do: published work due from a week ago onward, not yet submitted.
-  let todo: Array<Assignment & { courseCode: string }> = [];
-  if (studentCourseIds.length) {
-    const since = daysFromNowIso(-7);
-    const { data: upcoming } = await supabase
-      .from("assignments")
-      .select("id, course_id, title, description, due_at, points_possible, submission_types, component, weight, published, created_at")
-      .in("course_id", studentCourseIds)
-      .eq("published", true)
-      .gte("due_at", since)
-      .order("due_at", { ascending: true })
-      .limit(20);
-    const list = (upcoming ?? []) as Assignment[];
-    const { data: mine } = list.length
-      ? await supabase
-          .from("submissions")
-          .select("assignment_id")
-          .eq("student_id", user.id)
-          .in(
-            "assignment_id",
-            list.map((a) => a.id),
-          )
-      : { data: [] };
-    const { data: quizDone } = list.length
-      ? await supabase
-          .from("quiz_attempts")
-          .select("assignment_id")
-          .eq("student_id", user.id)
-          .not("submitted_at", "is", null)
-          .in(
-            "assignment_id",
-            list.map((a) => a.id),
-          )
-      : { data: [] };
-    const done = new Set(
-      [...(mine ?? []), ...(quizDone ?? [])].map((s: { assignment_id: string }) => s.assignment_id),
-    );
-    todo = list
-      .filter((a) => !done.has(a.id))
-      .map((a) => ({ ...a, courseCode: byId.get(a.course_id)?.course.code ?? "" }));
-  }
+  const [assignmentsRes, eventsRes, notifRes] = await Promise.all([
+    courseIds.length
+      ? supabase
+          .from("assignments")
+          .select("id, course_id, title, due_at, points_possible, weight, published")
+          .in("course_id", courseIds)
+          .eq("published", true)
+      : Promise.resolve({ data: [] as Item[] }),
+    supabase
+      .from("calendar_events")
+      .select("id, institution_id, course_id, title, description, location, kind, starts_at, ends_at, repeat_weekly_until")
+      .lte("starts_at", watDayStart(addDays(today, 1)).toISOString())
+      .or(`repeat_weekly_until.gte.${today},ends_at.gte.${watDayStart(today).toISOString()}`),
+    supabase
+      .from("notifications")
+      .select("id, kind, data, link, course_id, created_at, read_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(5),
+  ]);
+  const assignments = (assignmentsRes.data ?? []) as Item[];
+  const todays = expandEvents((eventsRes.data ?? []) as CalendarEvent[], watDayStart(today), watDayStart(addDays(today, 1)));
+  const latest = (notifRes.data ?? []) as AppNotification[];
 
-  // Staff to-do: submissions waiting for a mark, per course.
+  // ----- Student side: what's handed in, marks, attendance -----
+  const studentAssignments = assignments.filter((a) => studentIds.includes(a.course_id));
+  const [subsRes, quizRes, gradesRes, attendanceRes] = studentIds.length
+    ? await Promise.all([
+        supabase.from("submissions").select("assignment_id").eq("student_id", user.id).in("course_id", studentIds),
+        supabase.from("quiz_attempts").select("assignment_id").eq("student_id", user.id).not("submitted_at", "is", null),
+        supabase.from("grades").select("assignment_id, student_id, score").eq("student_id", user.id).in("course_id", studentIds),
+        supabase.from("attendance_records").select("status").eq("student_id", user.id),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
+  const handedIn = new Set(
+    [...(subsRes.data ?? []), ...(quizRes.data ?? []), ...(gradesRes.data ?? [])].map((r: { assignment_id: string }) => r.assignment_id),
+  );
+  const grades = (gradesRes.data ?? []) as Array<{ assignment_id: string; student_id: string; score: number | null }>;
+  const courseAverages = studentIds
+    .map((cid) => weightedAverage(studentAssignments.filter((a) => a.course_id === cid), grades, user.id))
+    .filter((v): v is number => v !== null);
+  const overall = courseAverages.length ? courseAverages.reduce((s, v) => s + v, 0) / courseAverages.length : null;
+  const att = (attendanceRes.data ?? []) as Array<{ status: string }>;
+  const attendanceRate = att.length ? att.filter((r) => r.status !== "absent").length / att.length : null;
+
+  const horizon = daysFromNowIso(21);
+  const dueSoon = studentAssignments
+    .filter((a) => a.due_at && a.due_at <= horizon && !handedIn.has(a.id) && daysUntil(a.due_at, now) >= -7)
+    .sort((a, b) => (a.due_at ?? "").localeCompare(b.due_at ?? ""))
+    .slice(0, 6);
+
+  // ----- Staff side: work to mark -----
   const toGrade = new Map<string, number>();
-  if (staffCourseIds.length) {
-    const [{ data: subs }, { data: grades }] = await Promise.all([
-      supabase.from("submissions").select("course_id, assignment_id, student_id").in("course_id", staffCourseIds),
-      supabase.from("grades").select("assignment_id, student_id, score").in("course_id", staffCourseIds),
+  let studentCount = 0;
+  if (staffIds.length) {
+    const [{ data: subs }, { data: staffGrades }, { count }] = await Promise.all([
+      supabase.from("submissions").select("course_id, assignment_id, student_id").in("course_id", staffIds),
+      supabase.from("grades").select("assignment_id, student_id, score").in("course_id", staffIds),
+      supabase.from("enrollments").select("user_id", { count: "exact", head: true }).in("course_id", staffIds).eq("role", "student"),
     ]);
+    studentCount = count ?? 0;
     const graded = new Set(
-      (grades ?? [])
+      (staffGrades ?? [])
         .filter((g: { score: number | null }) => g.score !== null)
         .map((g: { assignment_id: string; student_id: string }) => `${g.assignment_id}:${g.student_id}`),
     );
     for (const s of (subs ?? []) as Array<{ course_id: string; assignment_id: string; student_id: string }>) {
-      if (!graded.has(`${s.assignment_id}:${s.student_id}`)) {
-        toGrade.set(s.course_id, (toGrade.get(s.course_id) ?? 0) + 1);
-      }
+      if (!graded.has(`${s.assignment_id}:${s.student_id}`)) toGrade.set(s.course_id, (toGrade.get(s.course_id) ?? 0) + 1);
     }
   }
+  const totalToGrade = [...toGrade.values()].reduce((s, n) => s + n, 0);
 
-  const firstName = (profile.full_name || "").split(" ")[0];
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Douala" }).format(now));
+  const greeting = hour < 17 ? t.shell.goodMorning : t.shell.goodEvening;
+  const firstName = (profile.full_name || "").replace(/^(Dr|Pr|M\.|Mme)\s+/i, "").split(" ")[0];
+  const isStudent = studentIds.length > 0 && staffIds.length === 0;
+
+  function dueLabel(iso: string) {
+    const d = daysUntil(iso, now);
+    if (d < 0) return { text: t.dash.overdue, cls: "bg-terracotta-50 text-terracotta-600" };
+    if (d === 0) return { text: t.dash.dueToday, cls: "bg-ochre-100 text-ochre-700" };
+    if (d === 1) return { text: t.dash.dueTomorrow, cls: "bg-ochre-50 text-ochre-700" };
+    return { text: fmt(t.dash.dueInDays, { n: d }), cls: "bg-slate-100 text-slate-600" };
+  }
 
   return (
     <>
-      <PageHeader title={firstName ? `${t.dashboard.title} · ${firstName}` : t.dashboard.title} />
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[15px] font-semibold capitalize text-slate-500">
+            {formatDayLabel(locale, today, { weekday: "long", day: "numeric", month: "long" })}
+          </p>
+          <h1 className="mt-1 font-display text-[2.4rem] font-semibold leading-tight">
+            {greeting}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
+        </div>
+      </div>
+
+      {/* Numbers that matter for this person */}
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {isStudent ? (
+          <>
+            <Stat label={t.dash.statAverage} value={overall === null ? "—" : formatScore(locale, Math.round(overall * 100) / 100)} hint="/20" tone={overall !== null && overall < 10 ? "terracotta" : "ink"} />
+            <Stat label={t.dash.statAttendance} value={attendanceRate === null ? "—" : `${Math.round(attendanceRate * 100)} %`} tone={attendanceRate !== null && attendanceRate < 0.75 ? "terracotta" : "leaf"} />
+            <Stat label={t.dash.statDue} value={dueSoon.length} tone={dueSoon.length ? "ochre" : "ink"} />
+            <Stat label={t.dash.statCourses} value={cards.length} />
+          </>
+        ) : (
+          <>
+            <Stat label={t.dash.statCourses} value={cards.length} />
+            <Stat label={t.dash.statStudents} value={studentCount} />
+            <Stat label={t.dash.statToGrade} value={totalToGrade} tone={totalToGrade ? "ochre" : "ink"} />
+            <Stat label={t.dash.todayTitle} value={todays.length} hint={t.calendar.timetable} />
+          </>
+        )}
+      </div>
+
+      <div className="grid gap-8 xl:grid-cols-[1fr_360px]">
         <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">{t.dashboard.myCourses}</h2>
+          <h2 className="mb-4 font-display text-2xl font-semibold">{t.dash.coursesTitle}</h2>
           {cards.length === 0 ? (
             <Empty>{t.dashboard.noCourses}</Empty>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {cards.map(({ course, role }) => (
-                <Link
-                  key={course.id}
-                  href={`/courses/${course.id}`}
-                  className="group overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="h-24 p-4" style={{ backgroundColor: course.color }}>
-                    <span className="rounded bg-black/20 px-2 py-0.5 text-xs font-semibold text-white">
-                      {course.code}
-                    </span>
-                  </div>
-                  <div className="space-y-2 p-4">
-                    <h3 className="line-clamp-2 font-semibold text-slate-900 group-hover:text-brand-700">
-                      {course.title}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge tone={role === "student" ? "info" : "brand"}>
-                        {role === "student" ? t.dashboard.student : t.dashboard.teaching}
-                      </Badge>
-                      {course.level ? <Badge>{course.level}</Badge> : null}
-                      {toGrade.get(course.id) ? (
-                        <Badge tone="warn">
-                          {toGrade.get(course.id)} {t.dashboard.toGrade}
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                </Link>
-              ))}
+              {cards.map(({ course, role }) => {
+                const mine = assignments.filter((a) => a.course_id === course.id);
+                const progress = role === "student" && mine.length ? mine.filter((a) => handedIn.has(a.id)).length / mine.length : null;
+                const pending = toGrade.get(course.id) ?? 0;
+                return (
+                  <CourseCard
+                    key={course.id}
+                    href={`/courses/${course.id}`}
+                    code={course.code}
+                    title={course.title}
+                    color={course.color}
+                    level={course.level}
+                    roleLabel={role === "student" ? t.dashboard.student : role === "admin" ? t.admin.roles.admin : t.dashboard.teaching}
+                    progress={progress}
+                    progressLabel={t.dash.done}
+                    footer={
+                      pending ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-ochre-100 px-2.5 py-0.5 text-[12.5px] font-bold text-ochre-700">
+                          <ClipboardCheck size={13} aria-hidden />
+                          {fmt(t.dash.toGrade, { n: pending })}
+                        </span>
+                      ) : null
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </section>
 
-        <aside>
+        <aside className="space-y-6">
           <Card>
-            <CardHeader title={t.dashboard.todo} />
-            {todo.length === 0 && toGrade.size === 0 ? (
-              <p className="px-5 py-6 text-sm text-slate-500">{t.dashboard.nothingDue}</p>
+            <CardHeader title={t.dash.todayTitle} action={<Link href="/calendar" className="text-[13.5px] font-semibold text-brand-600 hover:underline">{t.shell.viewAll}</Link>} />
+            {todays.length === 0 ? (
+              <p className="px-5 py-5 text-[15px] text-slate-500">{t.dash.nothingToday}</p>
             ) : (
-              <ul className="divide-y divide-slate-100">
-                {todo.map((a) => (
-                  <li key={a.id}>
-                    <Link href={`/courses/${a.course_id}/assignments/${a.id}`} className="flex gap-3 px-5 py-3 hover:bg-slate-50">
-                      <CalendarClock size={18} className="mt-0.5 shrink-0 text-brand-600" aria-hidden />
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium text-slate-900">{a.title}</span>
-                        <span className={`block text-xs ${isPast(a.due_at) ? "text-red-600" : "text-slate-500"}`}>
-                          {a.courseCode} · {formatDateTime(locale, a.due_at)}
-                        </span>
+              <ol className="relative px-5 py-4">
+                {todays.map((ev) => (
+                  <li key={`${ev.id}-${ev.occurrence_start}`} className="relative flex gap-4 pb-4 last:pb-0">
+                    <span className="num w-12 shrink-0 pt-0.5 text-right text-[13.5px] font-bold text-slate-500">
+                      {formatTime(locale, ev.occurrence_start)}
+                    </span>
+                    <span className="w-1 shrink-0 rounded-full" style={{ backgroundColor: EVENT_COLORS[ev.kind] }} />
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-semibold">{ev.title}</span>
+                      <span className="flex items-center gap-1 text-[13px] text-slate-500">
+                        {formatTime(locale, ev.occurrence_end)}
+                        {ev.location ? (
+                          <>
+                            <MapPin size={12} aria-hidden className="ml-1.5" />
+                            {ev.location}
+                          </>
+                        ) : null}
                       </span>
-                    </Link>
+                    </span>
                   </li>
                 ))}
-                {[...toGrade.entries()].map(([courseId, count]) => (
-                  <li key={courseId}>
-                    <Link href={`/courses/${courseId}/assignments`} className="flex gap-3 px-5 py-3 hover:bg-slate-50">
-                      <ClipboardCheck size={18} className="mt-0.5 shrink-0 text-amber-600" aria-hidden />
-                      <span className="text-sm">
-                        <span className="font-medium">{byId.get(courseId)?.course.code}</span> · {count} {t.dashboard.toGrade}
+              </ol>
+            )}
+          </Card>
+
+          {studentIds.length ? (
+            <Card>
+              <CardHeader title={t.dash.upNext} />
+              {dueSoon.length === 0 ? (
+                <p className="px-5 py-5 text-[15px] text-slate-500">{t.dash.allClear}</p>
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {dueSoon.map((a) => {
+                    const label = dueLabel(a.due_at as string);
+                    return (
+                      <li key={a.id}>
+                        <Link href={`/courses/${a.course_id}/assignments/${a.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
+                          <CalendarClock size={18} className="shrink-0 text-slate-400" aria-hidden />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[15px] font-semibold">{a.title}</span>
+                            <span className="num block text-[13px] text-slate-500">{byId.get(a.course_id)?.course.code}</span>
+                          </span>
+                          <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-bold ${label.cls}`}>{label.text}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+          ) : null}
+
+          <Card>
+            <CardHeader title={t.dash.latest} action={<Link href="/notifications" className="text-[13.5px] font-semibold text-brand-600 hover:underline">{t.shell.viewAll}</Link>} />
+            {latest.length === 0 ? (
+              <p className="px-5 py-5 text-[15px] text-slate-500">{t.shell.noNotifications}</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {latest.map((n) => (
+                  <li key={n.id}>
+                    <Link href={n.link ?? "/notifications"} className="flex gap-3 px-5 py-3 hover:bg-slate-50">
+                      <span aria-hidden className={`mt-2 h-2 w-2 shrink-0 rotate-45 ${n.read_at ? "bg-slate-300" : "bg-ochre-500"}`} />
+                      <span className="min-w-0">
+                        <span className="block text-[14.5px] leading-snug text-slate-800">{notificationText(t.notif, locale, n)}</span>
+                        <span className="text-[12.5px] text-slate-500">{timeAgo(locale, n.created_at, now)}</span>
                       </span>
                     </Link>
                   </li>

@@ -85,14 +85,14 @@ export default async function ResultsPage() {
                 </div>
                 <div className="grid gap-4 px-5 py-4 sm:grid-cols-3">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">{t.lmd.average}</p>
+                    <p className="text-[12.5px] font-semibold text-slate-500">{t.lmd.average}</p>
                     <p className="text-2xl font-semibold">
                       {formatScore(locale, r.semester_average === null ? null : Number(r.semester_average))}
                       <span className="text-sm font-normal text-slate-500">/20</span>
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">{t.lmd.credits}</p>
+                    <p className="text-[12.5px] font-semibold text-slate-500">{t.lmd.credits}</p>
                     <p className="text-2xl font-semibold">
                       {r.credits_earned}
                       <span className="text-sm font-normal text-slate-500"> / {r.credits_total}</span>

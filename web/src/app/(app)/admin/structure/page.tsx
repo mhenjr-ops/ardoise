@@ -220,7 +220,7 @@ export default async function StructurePage({ searchParams }: PageProps<"/admin/
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-slate-200 text-left text-[12.5px] text-slate-500">
                   <th className="py-2 pr-3">Code</th>
                   <th className="py-2 pr-3">{t.common.title}</th>
                   <th className="py-2 pr-3">{t.lmd.credits}</th>

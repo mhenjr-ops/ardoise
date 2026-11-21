@@ -24,12 +24,15 @@ export default async function AssignmentPage({
 
   const { data } = await supabase
     .from("assignments")
-    .select("id, course_id, title, description, due_at, points_possible, submission_types, component, weight, published, created_at")
+    .select("id, course_id, title, description, due_at, points_possible, submission_types, component, weight, published, created_at, rubric_id")
     .eq("id", assignmentId)
     .eq("course_id", course.id)
     .maybeSingle();
   if (!data) notFound();
-  const assignment = data as Assignment;
+  const assignment = data as Assignment & { rubric_id: string | null };
+  const { data: rubricRows } = isStaff
+    ? await supabase.from("rubrics").select("id, title").eq("course_id", course.id).order("title")
+    : { data: [] };
 
   const isStudent = courseRole === "student";
   const isQuiz = assignment.submission_types.includes("quiz");
@@ -97,17 +100,17 @@ export default async function AssignmentPage({
         </div>
         <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm text-slate-600 sm:grid-cols-3">
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-400">{t.assignments.dueAt}</dt>
+            <dt className="text-[12.5px] font-semibold text-slate-500">{t.assignments.dueAt}</dt>
             <dd className={late ? "text-red-600" : ""}>{assignment.due_at ? formatDateTime(locale, assignment.due_at) : t.common.noDue}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-400">{t.assignments.pointsPossible}</dt>
+            <dt className="text-[12.5px] font-semibold text-slate-500">{t.assignments.pointsPossible}</dt>
             <dd>
               {formatScore(locale, assignment.points_possible)} {t.common.points}
             </dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-400">{t.assignments.weight}</dt>
+            <dt className="text-[12.5px] font-semibold text-slate-500">{t.assignments.weight}</dt>
             <dd>×{formatScore(locale, assignment.weight)}</dd>
           </div>
         </dl>
@@ -157,7 +160,7 @@ export default async function AssignmentPage({
               </p>
               {grade.comment ? (
                 <div className="mt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">{t.assignments.feedback}</p>
+                  <p className="text-[13px] font-bold text-brand-600">{t.assignments.feedback}</p>
                   <p className="prose-lite mt-1 text-sm text-slate-800">{grade.comment}</p>
                 </div>
               ) : null}
@@ -220,7 +223,12 @@ export default async function AssignmentPage({
             <input type="hidden" name="course_id" value={course.id} />
             <input type="hidden" name="id" value={assignment.id} />
             {isQuiz ? <input type="hidden" name="is_quiz" value="1" /> : null}
-            <AssignmentFields t={t} assignment={assignment} quiz={isQuiz} />
+            <AssignmentFields
+              t={t}
+              assignment={assignment}
+              quiz={isQuiz}
+              rubrics={(rubricRows ?? []) as Array<{ id: string; title: string }>}
+            />
             <Button type="submit">{t.common.save}</Button>
           </form>
         </Disclosure>

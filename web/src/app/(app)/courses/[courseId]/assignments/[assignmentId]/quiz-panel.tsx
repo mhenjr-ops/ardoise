@@ -50,19 +50,19 @@ export async function QuizPanel({
   const summary = (
     <dl className="grid gap-x-6 gap-y-2 text-sm text-slate-600 sm:grid-cols-4">
       <div>
-        <dt className="text-xs uppercase tracking-wide text-slate-400">{t.quiz.timeLimit.split("(")[0]}</dt>
+        <dt className="text-[12.5px] font-semibold text-slate-500">{t.quiz.timeLimit.split("(")[0]}</dt>
         <dd>{quiz.time_limit_minutes ? `${quiz.time_limit_minutes} ${t.quiz.minutes}` : t.quiz.unlimited}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase tracking-wide text-slate-400">{t.quiz.attempts}</dt>
+        <dt className="text-[12.5px] font-semibold text-slate-500">{t.quiz.attempts}</dt>
         <dd>{quiz.attempts_allowed}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase tracking-wide text-slate-400">{t.quiz.questions}</dt>
+        <dt className="text-[12.5px] font-semibold text-slate-500">{t.quiz.questions}</dt>
         <dd>{quiz.question_count ?? "—"}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase tracking-wide text-slate-400">{t.quiz.showResults}</dt>
+        <dt className="text-[12.5px] font-semibold text-slate-500">{t.quiz.showResults}</dt>
         <dd>{t.quiz.showResultsOptions[quiz.show_results]}</dd>
       </div>
     </dl>

@@ -161,3 +161,108 @@ export type AttemptReview = {
     explanation: string | null;
   }>;
 };
+
+// ---------------------------------------------------------------------------
+// Sprint 3: engagement
+// ---------------------------------------------------------------------------
+export type NotificationKind =
+  | "announcement"
+  | "assignment"
+  | "grade"
+  | "submission"
+  | "message"
+  | "discussion"
+  | "results"
+  | "attendance";
+
+export type AppNotification = {
+  id: number;
+  kind: NotificationKind;
+  data: Record<string, string | number | null>;
+  link: string | null;
+  course_id: string | null;
+  created_at: string;
+  read_at: string | null;
+};
+
+export type EventKind = "class" | "exam" | "event" | "office_hours" | "holiday";
+
+export type CalendarEvent = {
+  id: string;
+  institution_id: string;
+  course_id: string | null;
+  title: string;
+  description: string;
+  location: string | null;
+  kind: EventKind;
+  starts_at: string;
+  ends_at: string;
+  repeat_weekly_until: string | null;
+};
+
+export type DiscussionTopic = {
+  id: string;
+  course_id: string;
+  title: string;
+  body: string;
+  author_id: string | null;
+  pinned: boolean;
+  locked: boolean;
+  reply_count: number;
+  created_at: string;
+  last_activity_at: string;
+};
+
+export type DiscussionReply = {
+  id: string;
+  topic_id: string;
+  parent_id: string | null;
+  author_id: string | null;
+  body: string;
+  created_at: string;
+  edited_at: string | null;
+};
+
+export type Conversation = {
+  id: string;
+  subject: string;
+  course_id: string | null;
+  created_at: string;
+  last_message_at: string;
+};
+
+export type Message = {
+  id: string;
+  conversation_id: string;
+  sender_id: string | null;
+  body: string;
+  created_at: string;
+};
+
+export type RubricLevel = { id: string; title: string; points: number };
+export type RubricCriterion = { id: string; title: string; description?: string; levels: RubricLevel[] };
+export type Rubric = { id: string; course_id: string; title: string; criteria: RubricCriterion[] };
+export type RubricRatings = Record<string, { level: string; points?: number; comment?: string }>;
+
+export type AttendanceStatus = "present" | "late" | "absent" | "excused";
+export type AttendanceSession = { id: string; course_id: string; starts_at: string; topic: string };
+export type AttendanceRecord = {
+  id: string;
+  session_id: string;
+  student_id: string;
+  status: AttendanceStatus;
+  method: "teacher" | "code";
+  marked_at: string;
+};
+
+export type CourseFile = {
+  id: string;
+  course_id: string;
+  folder: string;
+  name: string;
+  storage_path: string;
+  size_bytes: number;
+  mime_type: string | null;
+  published: boolean;
+  created_at: string;
+};

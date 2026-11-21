@@ -1,0 +1,36 @@
+// Runs demo.sql then demo-engage.sql on the migrated schema.
+import { readFileSync } from 'node:fs';
+import { setup } from './harness.mjs';
+
+const { db, check, done } = await setup([]);
+await db.exec(`
+  alter table auth.users
+    add column instance_id uuid, add column aud text, add column role text,
+    add column encrypted_password text, add column email_confirmed_at timestamptz,
+    add column raw_app_meta_data jsonb, add column created_at timestamptz, add column updated_at timestamptz,
+    add column confirmation_token text, add column recovery_token text, add column email_change_token_new text,
+    add column email_change text, add column email_change_token_current text, add column phone_change_token text,
+    add column reauthentication_token text;
+  create table auth.identities (id uuid primary key, user_id uuid references auth.users(id), provider_id text,
+    identity_data jsonb, provider text, last_sign_in_at timestamptz, created_at timestamptz, updated_at timestamptz);
+  create schema if not exists extensions;
+  create function extensions.gen_salt(text) returns text language sql as $$ select '$2a$06$stub' $$;
+  create function extensions.crypt(text, text) returns text language sql as $$ select $2 || md5($1) $$;
+`);
+await db.exec(readFileSync(new URL('../seed/demo.sql', import.meta.url), 'utf8'));
+const engage = readFileSync(new URL('../seed/demo-engage.sql', import.meta.url), 'utf8');
+await db.exec(engage);
+const n = async (sql) => Number((await db.query(sql)).rows[0].n);
+check('7 calendar events', (await n('select count(*) n from public.calendar_events')) === 7);
+check('3 topics, 4 replies', (await n('select count(*) n from public.discussion_topics')) === 3 && (await n('select count(*) n from public.discussion_replies')) === 4);
+check('reply counts kept by trigger', (await n(`select sum(reply_count) n from public.discussion_topics`)) === 4);
+check('2 conversations, 3 messages', (await n('select count(*) n from public.conversations')) === 2 && (await n('select count(*) n from public.messages')) === 3);
+check('rubric attached to TP 1', (await n(`select count(*) n from public.assignments where rubric_id is not null`)) === 1);
+check('6 attendance sessions, 30 records', (await n('select count(*) n from public.attendance_sessions')) === 6 && (await n('select count(*) n from public.attendance_records')) === 30);
+check('Yannick misses three sessions', (await n(`select count(*) n from public.attendance_records r join public.profiles p on p.id = r.student_id where p.email = 'yannick@demo.ardoise.cm' and r.status = 'absent'`)) === 3);
+check('sessions are in the past', (await n(`select count(*) n from public.attendance_sessions where starts_at > now()`)) === 0);
+check('notifications created (triggers + seeded)', (await n('select count(*) n from public.notifications')) > 20);
+check('syllabus written', (await n(`select count(*) n from public.courses where syllabus <> ''`)) === 2);
+await db.exec(engage);
+check('second run changes nothing', (await n('select count(*) n from public.discussion_topics')) === 3);
+done();

@@ -63,6 +63,7 @@ export async function updateAssignment(formData: FormData) {
       published: formData.get("published") === "on",
       // A quiz stays a quiz: its type is not editable from this form.
       submission_types: formData.get("is_quiz") === "1" ? ["quiz"] : types.length ? types : ["text", "file"],
+      ...(formData.has("rubric_id") ? { rubric_id: String(formData.get("rubric_id") ?? "") || null } : {}),
     })
     .eq("id", id);
   if (error) redirect(`${back}?error=forbidden`);

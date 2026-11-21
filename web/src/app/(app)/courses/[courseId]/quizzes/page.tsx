@@ -54,7 +54,7 @@ export default async function QuizBanksPage({ params, searchParams }: PageProps<
       {(banks ?? []).length > 0 ? (
         <Empty>
           <Link href={`/courses/${course.id}/assignments`} className="font-medium text-brand-700 hover:underline">
-            {t.quiz.newQuiz} →
+            {t.quiz.newQuiz}
           </Link>
         </Empty>
       ) : null}

@@ -4,7 +4,17 @@ import type { Assignment } from "@/lib/types";
 import { isoToCameroonLocal } from "@/lib/format";
 
 /** Shared fields for creating and editing an assignment. */
-export function AssignmentFields({ t, assignment, quiz = false }: { t: Messages; assignment?: Assignment; quiz?: boolean }) {
+export function AssignmentFields({
+  t,
+  assignment,
+  quiz = false,
+  rubrics = [],
+}: {
+  t: Messages;
+  assignment?: Assignment & { rubric_id?: string | null };
+  quiz?: boolean;
+  rubrics?: Array<{ id: string; title: string }>;
+}) {
   const types = assignment?.submission_types ?? ["text", "file"];
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -36,7 +46,21 @@ export function AssignmentFields({ t, assignment, quiz = false }: { t: Messages;
       <Field label={t.assignments.weight}>
         <Input name="weight" type="number" min="0" step="0.5" defaultValue={assignment?.weight ?? 1} />
       </Field>
-      <div className="flex flex-wrap gap-5 text-sm sm:col-span-2">
+      {!quiz && rubrics.length ? (
+        <div className="sm:col-span-2">
+          <Field label={t.rubrics.attach}>
+            <Select name="rubric_id" defaultValue={assignment?.rubric_id ?? ""}>
+              <option value="">{t.rubrics.none}</option>
+              {rubrics.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.title}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap gap-5 text-[15px] sm:col-span-2">
         {quiz ? null : (
           <>
         <label className="flex items-center gap-2">

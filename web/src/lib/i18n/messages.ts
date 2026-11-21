@@ -1,3 +1,5 @@
+import { enEngage, frEngage, type EngageMessages } from "./messages-engage";
+
 export type Locale = "fr" | "en";
 export const LOCALES: Locale[] = ["fr", "en"];
 
@@ -350,12 +352,14 @@ const fr = {
     deliberation_published: "Une délibération publiée ne peut plus être modifiée.",
     bonus_too_high: "Bonus supérieur au maximum autorisé.",
     duplicate: "Cet élément existe déjà.",
+    topic_locked: "Ce sujet est fermé aux nouvelles réponses.",
+    file_too_big: "Fichier trop volumineux.",
   },
 };
 
-export type Messages = typeof fr;
+export type CoreMessages = typeof fr;
 
-const en: Messages = {
+const en: CoreMessages = {
   common: {
     appName: "Ardoise",
     save: "Save",
@@ -704,10 +708,17 @@ const en: Messages = {
     deliberation_published: "A published deliberation can't be changed.",
     bonus_too_high: "Bonus above the allowed maximum.",
     duplicate: "This already exists.",
+    topic_locked: "This topic is closed to new replies.",
+    file_too_big: "File too large.",
   },
 };
 
-export const messages: Record<Locale, Messages> = { fr, en };
+export type Messages = CoreMessages & EngageMessages;
+
+export const messages: Record<Locale, Messages> = {
+  fr: { ...fr, ...frEngage },
+  en: { ...en, ...enEngage },
+};
 
 export function isLocale(value: unknown): value is Locale {
   return value === "fr" || value === "en";

@@ -10,6 +10,7 @@ const KNOWN = [
   "bonus_too_high",
   "slug_taken",
   "invalid",
+  "topic_locked",
 ];
 
 /** Turns a Supabase/Postgres error into one of the translated error codes. */

@@ -65,7 +65,7 @@ export default async function VerifyPage({ params }: PageProps<"/verify/[code]">
               ] as Array<[string, string]>
             ).map(([k, val]) => (
               <div key={k}>
-                <dt className="text-xs uppercase tracking-wide text-slate-400">{k}</dt>
+                <dt className="text-[12.5px] font-semibold text-slate-500">{k}</dt>
                 <dd className="font-medium text-slate-900">{val}</dd>
               </div>
             ))}
