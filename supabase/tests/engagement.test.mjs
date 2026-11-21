@@ -78,6 +78,12 @@ await as('T', `update public.discussion_topics set locked = true, pinned = true 
 await expectError('student cannot reply to a locked topic', () => as('S2', `insert into public.discussion_replies (topic_id, body) values ($1, 'encore')`, [topic.id]), 'topic_locked');
 await as('T', `insert into public.discussion_replies (topic_id, body) values ($1, 'Fermé, voir le cours 2.')`, [topic.id]);
 check('teacher can still reply when locked', (await count('S1', `select count(*) n from public.discussion_replies where topic_id = $1`, [topic.id])) === 2);
+{
+  const r = await one('T', `insert into public.discussion_replies (topic_id, body, created_at) values ($1, 'antidaté', '2020-01-01') returning created_at`, [topic.id]);
+  check('a reply cannot be backdated', new Date(r.created_at).getFullYear() > 2020);
+  const tp = await one('S1', `insert into public.discussion_topics (course_id, title, created_at) select course_id, 'Antidaté', '2020-01-01' from public.discussion_topics where id = $1 returning created_at`, [topic.id]);
+  check('a topic cannot be backdated', new Date(tp.created_at).getFullYear() > 2020);
+}
 check('outsider sees no topics', (await count('X', `select count(*) n from public.discussion_topics`)) === 0);
 
 // ----- Calendar -----

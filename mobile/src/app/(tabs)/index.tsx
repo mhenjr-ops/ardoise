@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { Icon, NdopPattern, Ring } from '@/components/ndop';
+import { Icon, NdopPattern } from '@/components/ndop';
 import { Text } from '@/components/text';
 import { Badge, Button, Card, Empty, Loading, Lozenge, Row, Screen, SectionTitle, Slate, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -178,14 +178,14 @@ export default function HomeScreen() {
                 label={t.statAverage}
                 value={data.stats.average === null ? '—' : formatScore(locale, data.stats.average)}
                 suffix={data.stats.average === null ? '' : '/20'}
-                ring={data.stats.average === null ? undefined : data.stats.average / 20}
+                meter={data.stats.average === null ? undefined : data.stats.average / 20}
               />
               <Stat
                 label={t.statAttendance}
                 value={data.stats.attendance === null ? '—' : String(data.stats.attendance)}
                 suffix={data.stats.attendance === null ? '' : '%'}
-                ring={data.stats.attendance === null ? undefined : data.stats.attendance / 100}
-                ringColor="#7FB58A"
+                meter={data.stats.attendance === null ? undefined : data.stats.attendance / 100}
+                meterColor="#8CC497"
               />
               <Stat label={t.statDue} value={String(data.stats.due)} />
             </>
@@ -309,19 +309,21 @@ export default function HomeScreen() {
   );
 }
 
-function Stat({ label, value, suffix, ring, ringColor = colors.ochre }: { label: string; value: string; suffix?: string; ring?: number; ringColor?: string }) {
+function Stat({ label, value, suffix, meter, meterColor = colors.ochre }: { label: string; value: string; suffix?: string; meter?: number; meterColor?: string }) {
   return (
     <View style={s.stat}>
-      {ring !== undefined ? (
-        <View style={{ position: 'absolute', right: 10, top: 10 }}>
-          <Ring value={Math.max(0, Math.min(1, ring))} size={26} stroke={3.5} color={ringColor} track="rgba(248,243,234,0.18)" />
-        </View>
-      ) : null}
-      <Text style={s.statLabel}>{label}</Text>
-      <Text style={s.statValue}>
+      <Text style={s.statLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={s.statValue} numberOfLines={1} adjustsFontSizeToFit>
         {value}
         {suffix ? <Text style={s.statSuffix}>{suffix}</Text> : null}
       </Text>
+      {meter !== undefined ? (
+        <View style={s.meterTrack}>
+          <View style={[s.meterFill, { width: `${Math.round(Math.max(0, Math.min(1, meter)) * 100)}%`, backgroundColor: meterColor }]} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -391,12 +393,15 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(248,243,234,0.08)',
     borderWidth: 1,
     borderColor: 'rgba(248,243,234,0.12)',
-    padding: 12,
-    gap: 4,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+    gap: 2,
   },
   statLabel: { color: 'rgba(248,243,234,0.72)', fontSize: 13.5, fontFamily: fonts.medium },
-  statValue: { color: colors.chalk, fontSize: 26, fontFamily: fonts.displayBold },
-  statSuffix: { color: 'rgba(248,243,234,0.6)', fontSize: 14, fontFamily: fonts.medium },
+  statValue: { color: colors.chalk, fontSize: 24, fontFamily: fonts.displayBold },
+  statSuffix: { color: 'rgba(248,243,234,0.6)', fontSize: 13, fontFamily: fonts.medium },
+  meterTrack: { height: 4, borderRadius: 2, backgroundColor: 'rgba(248,243,234,0.16)', marginTop: 6, overflow: 'hidden' },
+  meterFill: { height: 4, borderRadius: 2 },
   time: { fontSize: 16, fontFamily: fonts.bold, color: colors.text, fontVariant: ['tabular-nums'] },
   timeEnd: { fontSize: 13.5, color: colors.muted, fontFamily: fonts.body, fontVariant: ['tabular-nums'] },
   bar: { width: 4, alignSelf: 'stretch', borderRadius: 2 },

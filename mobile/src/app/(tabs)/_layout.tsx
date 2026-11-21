@@ -1,4 +1,5 @@
 import { Redirect } from 'expo-router';
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router/js-tabs';
 import { Icon } from '@/components/ndop';
 import { HeaderBell } from '@/components/header-bell';
@@ -22,8 +23,12 @@ export default function TabsLayout() {
         headerRight: () => <HeaderBell />,
         tabBarActiveTintColor: colors.board,
         tabBarInactiveTintColor: '#A8977D',
-        tabBarLabelStyle: { fontFamily: fonts.bold, fontSize: 12 },
-        tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.border },
+        tabBarLabelStyle: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 },
+        // Native tab bars size themselves around the safe area; the browser preview needs room for the labels.
+        tabBarStyle: Platform.select({
+          web: { backgroundColor: colors.card, borderTopColor: colors.border, height: 62, paddingTop: 6, paddingBottom: 8 },
+          default: { backgroundColor: colors.card, borderTopColor: colors.border },
+        }),
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >

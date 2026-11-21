@@ -5,7 +5,7 @@ import { Text } from '@/components/text';
 import { Card, Empty, Loading, Lozenge, Row, Screen, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { EVENT_COLORS, expandEvents, type CalendarEvent, type EventKind } from '@/lib/engage';
-import { fmt, formatDay, formatTime, useI18n, watDayKey } from '@/lib/i18n';
+import { formatDay, formatTime, useI18n, watDayKey } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 
 const DAY = 86400000;
@@ -20,6 +20,7 @@ type Item = {
   sub: string;
   color: string;
   kind: EventKind | 'due';
+  done?: boolean;
   href: { pathname: '/course/[id]' | '/assignment/[id]'; params: { id: string } } | null;
 };
 
@@ -61,6 +62,15 @@ export default function AgendaScreen() {
           .lt('due_at', new Date(to).toISOString())
       : { data: [] as { id: string; course_id: string; title: string; due_at: string }[] };
 
+    const dueIds = ((dues ?? []) as { id: string }[]).map((a) => a.id);
+    const [{ data: subs }, { data: quizzes }] = dueIds.length
+      ? await Promise.all([
+          supabase.from('submissions').select('assignment_id').eq('student_id', userId).in('assignment_id', dueIds),
+          supabase.from('quiz_attempts').select('assignment_id').eq('student_id', userId).not('submitted_at', 'is', null).in('assignment_id', dueIds),
+        ])
+      : [{ data: [] }, { data: [] }];
+    const handedIn = new Set([...(subs ?? []), ...(quizzes ?? [])].map((r: { assignment_id: string }) => r.assignment_id));
+
     const list: Item[] = [];
     for (const o of expandEvents((events ?? []) as CalendarEvent[], from, to)) {
       const c = o.course_id ? courses.get(o.course_id) : undefined;
@@ -84,15 +94,16 @@ export default function AgendaScreen() {
         start: a.due_at,
         end: null,
         title: a.title,
-        sub: fmt(t.dueAt, { course: c?.code ?? '' }),
+        sub: c?.code ?? '',
         color: colors.ochre,
         kind: 'due',
+        done: handedIn.has(a.id),
         href: { pathname: '/assignment/[id]', params: { id: a.id } },
       });
     }
     list.sort((a, b) => a.start.localeCompare(b.start));
     setItems(list);
-  }, [userId, t.dueAt]);
+  }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -175,11 +186,13 @@ export default function AgendaScreen() {
                         <Text style={s.title}>{it.title}</Text>
                         <Text style={s.sub}>{it.sub}</Text>
                       </View>
-                      {it.kind !== 'class' ? (
-                        <View style={[s.kind, { backgroundColor: it.kind === 'due' ? colors.ochreSoft : '#F1E9DC' }]}>
-                          <Text style={[s.kindText, { color: it.kind === 'due' ? colors.ochreText : it.color }]}>
-                            {it.kind === 'due' ? t.statDue : t.kinds[it.kind]}
-                          </Text>
+                      {it.kind === 'due' ? (
+                        <View style={[s.kind, { backgroundColor: it.done ? colors.leafSoft : colors.ochreSoft }]}>
+                          <Text style={[s.kindText, { color: it.done ? colors.leaf : colors.ochreText }]}>{it.done ? t.submitted : t.statDue}</Text>
+                        </View>
+                      ) : it.kind !== 'class' ? (
+                        <View style={[s.kind, { backgroundColor: '#F1E9DC' }]}>
+                          <Text style={[s.kindText, { color: it.color }]}>{t.kinds[it.kind]}</Text>
                         </View>
                       ) : null}
                     </Row>

@@ -64,25 +64,29 @@ begin
   update public.calendar_events set created_by = u_admin where course_id is null and institution_id = v_inst;
 
   -- Discussions
-  insert into public.discussion_topics (course_id, title, body, author_id, pinned)
-  values (c_inf, 'Questions sur le TP 1', E'Posez ici vos questions sur le TP 1 (calcul de moyenne). Je réponds chaque soir.', u_mbarga, true)
+  -- Explicit times so the threads read like a real week (users can't backdate: see server_timestamps).
+  insert into public.discussion_topics (course_id, title, body, author_id, pinned, created_at)
+  values (c_inf, 'Questions sur le TP 1', E'Posez ici vos questions sur le TP 1 (calcul de moyenne). Je réponds chaque soir.', u_mbarga, true, now() - interval '6 days')
   returning id into topic1;
-  insert into public.discussion_replies (topic_id, author_id, body)
-  values (topic1, u_ines, 'Est-ce qu''on doit gérer le cas où l''utilisateur tape une note au-dessus de 20 ?')
+  insert into public.discussion_replies (topic_id, author_id, body, created_at)
+  values (topic1, u_ines, 'Est-ce qu''on doit gérer le cas où l''utilisateur tape une note au-dessus de 20 ?', now() - interval '5 days 4 hours')
   returning id into r1;
-  insert into public.discussion_replies (topic_id, parent_id, author_id, body)
-  values (topic1, r1, u_mbarga, 'Oui : affichez un message et redemandez la note. C''est un bon réflexe à prendre.');
+  insert into public.discussion_replies (topic_id, parent_id, author_id, body, created_at)
+  values (topic1, r1, u_mbarga, 'Oui : affichez un message et redemandez la note. C''est un bon réflexe à prendre.', now() - interval '5 days 1 hour');
 
-  insert into public.discussion_topics (course_id, title, body, author_id)
-  values (c_inf, 'Quand utiliser for plutôt que while ?', E'Je ne vois pas bien la différence entre les deux boucles. Quelqu''un peut expliquer avec un exemple ?', u_cedric)
+  insert into public.discussion_topics (course_id, title, body, author_id, created_at)
+  values (c_inf, 'Quand utiliser for plutôt que while ?', E'Je ne vois pas bien la différence entre les deux boucles. Quelqu''un peut expliquer avec un exemple ?', u_cedric, now() - interval '2 days 6 hours')
   returning id into topic2;
-  insert into public.discussion_replies (topic_id, author_id, body)
-  values (topic2, u_brenda, E'for quand tu connais le nombre de tours (parcourir une liste de notes), while quand tu attends une condition (redemander tant que la saisie est invalide).');
-  insert into public.discussion_replies (topic_id, author_id, body)
-  values (topic2, u_mbarga, E'Exactement. Exemple : for note in notes: ... contre while note > 20: note = float(input()). On en parle jeudi en TP.');
+  insert into public.discussion_replies (topic_id, author_id, body, created_at)
+  values (topic2, u_brenda, E'for quand tu connais le nombre de tours (parcourir une liste de notes), while quand tu attends une condition (redemander tant que la saisie est invalide).', now() - interval '2 days 2 hours');
+  insert into public.discussion_replies (topic_id, author_id, body, created_at)
+  values (topic2, u_mbarga, E'Exactement. Exemple : for note in notes: ... contre while note > 20: note = float(input()). On en parle jeudi en TP.', now() - interval '1 day 20 hours');
 
-  insert into public.discussion_topics (course_id, title, body, author_id)
-  values (c_eng, 'Useful phrases for formal emails', E'Share one phrase you find useful when writing to a lecturer or an employer.', u_bello);
+  insert into public.discussion_topics (course_id, title, body, author_id, created_at)
+  values (c_eng, 'Useful phrases for formal emails', E'Share one phrase you find useful when writing to a lecturer or an employer.', u_bello, now() - interval '3 days');
+  update public.discussion_topics t set last_activity_at = coalesce(
+    (select max(r.created_at) from public.discussion_replies r where r.topic_id = t.id), t.created_at)
+  where t.course_id in (c_inf, c_eng);
 
   -- Inbox
   insert into public.conversations (institution_id, course_id, subject, created_by)
@@ -100,6 +104,15 @@ begin
   values (conv, u_cedric, v_inst, now()), (conv, u_admin, v_inst, null);
   insert into public.messages (conversation_id, sender_id, body)
   values (conv, u_cedric, E'Bonjour, j''ai besoin d''une attestation de scolarité pour ma demande de bourse. Comment faire ?');
+
+  -- The insert trigger stamps every message with now(); give the demo a real timeline.
+  update public.messages set created_at = now() - interval '3 hours' where sender_id = u_brenda;
+  update public.messages set created_at = now() - interval '40 minutes' where sender_id = u_mbarga;
+  update public.messages set created_at = now() - interval '1 day' where sender_id = u_cedric;
+  update public.conversations c set last_message_at = (select max(m.created_at) from public.messages m where m.conversation_id = c.id);
+  update public.conversation_participants set last_read_at = now() - interval '3 hours' where user_id = u_brenda;
+  update public.conversation_participants set last_read_at = now() - interval '40 minutes' where user_id = u_mbarga;
+  update public.conversation_participants set last_read_at = now() - interval '1 day' where user_id = u_cedric;
 
   -- Rubric on TP 1, with Brenda's assessment matching her 15/20
   select id into tp1 from public.assignments where course_id = c_inf and title like 'TP 1%';

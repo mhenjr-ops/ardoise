@@ -25,6 +25,15 @@ check('7 calendar events', (await n('select count(*) n from public.calendar_even
 check('3 topics, 4 replies', (await n('select count(*) n from public.discussion_topics')) === 3 && (await n('select count(*) n from public.discussion_replies')) === 4);
 check('reply counts kept by trigger', (await n(`select sum(reply_count) n from public.discussion_topics`)) === 4);
 check('2 conversations, 3 messages', (await n('select count(*) n from public.conversations')) === 2 && (await n('select count(*) n from public.messages')) === 3);
+{
+  const { rows } = await db.query(`select p.full_name from public.messages m join public.profiles p on p.id = m.sender_id
+    join public.conversations c on c.id = m.conversation_id where c.subject = 'Question sur le TP 1' order by m.created_at desc limit 1`);
+  check("the teacher's reply is the latest message in Brenda's thread", rows[0]?.full_name === 'Dr Jean-Paul Mbarga');
+  const { rows: unread } = await db.query(`select (c.last_message_at > p.last_read_at) as unread from public.conversation_participants p
+    join public.conversations c on c.id = p.conversation_id join public.profiles u on u.id = p.user_id
+    where c.subject = 'Question sur le TP 1' and u.full_name = 'Brenda Fon'`);
+  check('Brenda has an unread reply', unread[0]?.unread === true);
+}
 check('rubric attached to TP 1', (await n(`select count(*) n from public.assignments where rubric_id is not null`)) === 1);
 check('6 attendance sessions, 30 records', (await n('select count(*) n from public.attendance_sessions')) === 6 && (await n('select count(*) n from public.attendance_records')) === 30);
 check('Yannick misses three sessions', (await n(`select count(*) n from public.attendance_records r join public.profiles p on p.id = r.student_id where p.email = 'yannick@demo.ardoise.cm' and r.status = 'absent'`)) === 3);
