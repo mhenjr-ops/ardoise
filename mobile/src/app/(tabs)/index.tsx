@@ -3,16 +3,17 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Icon, NdopPattern } from '@/components/ndop';
 import { Text } from '@/components/text';
-import { Badge, Button, Card, Empty, Loading, Lozenge, Row, Screen, SectionTitle, Slate, colors, fonts } from '@/components/ui';
+import { Avatar, Badge, Button, Card, Empty, Loading, Lozenge, Row, Screen, SectionTitle, Slate, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { daysUntil, expandEvents, type CalendarEvent, type Occurrence } from '@/lib/engage';
-import { fmt, formatDay, formatScore, formatTime, useI18n, watDayKey } from '@/lib/i18n';
+import { fmt, formatDay, formatScore, formatTime, timeAgo, useI18n, watDayKey } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import { weightedAverage, type Assignment, type Course, type Grade } from '@/lib/types';
 
 type Role = 'teacher' | 'ta' | 'student';
 type CourseCard = Course & { role: Role };
 type Due = Assignment & { code: string; color: string };
+type Pending = { assignment_id: string; title: string; code: string; student: string; submitted_at: string };
 type Stats = { average: number | null; attendance: number | null; due: number; courses: number; toGrade: number };
 type Home = {
   name: string;
@@ -20,10 +21,21 @@ type Home = {
   courses: CourseCard[];
   todo: Due[];
   today: (Occurrence & { code: string; color: string })[];
+  pending: Pending[];
   stats: Stats;
   student: boolean;
   staff: boolean;
 };
+
+const TITLES = new Set(['dr', 'dr.', 'pr', 'pr.', 'prof', 'prof.', 'm.', 'mme', 'mlle', 'mr', 'mrs', 'ms']);
+
+/** "Brenda Fon" → "Brenda"; "Dr Jean-Paul Mbarga" → "Dr Mbarga". */
+function greetingName(full: string) {
+  const words = full.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  if (TITLES.has(words[0].toLowerCase()) && words.length > 1) return `${words[0]} ${words[words.length - 1]}`;
+  return words[0];
+}
 
 function one<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
@@ -82,7 +94,11 @@ export default function HomeScreen() {
         .select('id, course_id, title, location, kind, starts_at, ends_at, repeat_weekly_until')
         .lt('starts_at', new Date(dayEnd).toISOString()),
       staffIds.length
-        ? supabase.from('submissions').select('assignment_id, student_id').in('course_id', staffIds)
+        ? supabase
+            .from('submissions')
+            .select('assignment_id, student_id, course_id, submitted_at, assignment:assignments(title), student:profiles(full_name, email)')
+            .in('course_id', staffIds)
+            .order('submitted_at', { ascending: true })
         : Promise.resolve({ data: [] }),
       staffIds.length
         ? supabase.from('grades').select('assignment_id, student_id, score').in('course_id', staffIds).not('score', 'is', null)
@@ -107,9 +123,27 @@ export default function HomeScreen() {
     const attended = records.filter((r) => r.status === 'present' || r.status === 'late' || r.status === 'excused').length;
 
     const graded = new Set(((staffGrades.data ?? []) as { assignment_id: string; student_id: string }[]).map((g) => `${g.assignment_id}:${g.student_id}`));
-    const toGrade = ((staffSubs.data ?? []) as { assignment_id: string; student_id: string }[]).filter(
-      (s) => !graded.has(`${s.assignment_id}:${s.student_id}`),
-    ).length;
+    type SubRow = {
+      assignment_id: string;
+      student_id: string;
+      course_id: string;
+      submitted_at: string;
+      assignment: { title: string } | { title: string }[] | null;
+      student: { full_name: string; email: string } | { full_name: string; email: string }[] | null;
+    };
+    const pending: Pending[] = ((staffSubs.data ?? []) as SubRow[])
+      .filter((s) => !graded.has(`${s.assignment_id}:${s.student_id}`))
+      .map((s) => {
+        const st = one(s.student);
+        return {
+          assignment_id: s.assignment_id,
+          title: one(s.assignment)?.title ?? '',
+          code: byId.get(s.course_id)?.code ?? '',
+          student: st ? st.full_name || st.email : '',
+          submitted_at: s.submitted_at,
+        };
+      });
+    const toGrade = pending.length;
 
     const today = expandEvents((events.data ?? []) as CalendarEvent[], dayStart, dayEnd)
       .filter((o) => o.day === watDayKey(stamp))
@@ -119,11 +153,12 @@ export default function HomeScreen() {
       });
 
     setData({
-      name: ((profile?.full_name as string | undefined) ?? '').split(' ')[0] ?? '',
+      name: greetingName((profile?.full_name as string | undefined) ?? ''),
       email: (profile?.email as string | undefined) ?? session?.user.email ?? '',
       courses,
       todo,
       today,
+      pending: pending.slice(0, 6),
       student: studentIds.length > 0,
       staff: staffIds.length > 0,
       stats: {
@@ -254,6 +289,34 @@ export default function HomeScreen() {
                   </Row>
                 );
               })}
+            </Card>
+          )}
+        </>
+      ) : null}
+
+      {data.staff ? (
+        <>
+          <SectionTitle>{t.toGradeList}</SectionTitle>
+          {data.pending.length === 0 ? (
+            <Empty text={t.nothingToGrade} />
+          ) : (
+            <Card>
+              {data.pending.map((p) => (
+                <Row
+                  key={`${p.assignment_id}-${p.student}`}
+                  onPress={() => router.push({ pathname: '/grade/[id]', params: { id: p.assignment_id } })}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                >
+                  <Avatar name={p.student} size={36} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={s.itemTitle}>{p.student}</Text>
+                    <Text style={s.meta} numberOfLines={1}>
+                      {p.code} · {p.title}
+                    </Text>
+                  </View>
+                  <Text style={s.meta}>{timeAgo(locale, p.submitted_at, now)}</Text>
+                </Row>
+              ))}
             </Card>
           )}
         </>

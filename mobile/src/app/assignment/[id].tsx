@@ -323,10 +323,8 @@ export default function AssignmentScreen() {
             <Button title={busy ? t.sending : submission ? t.resubmit : t.submit} onPress={submit} loading={busy} />
           </Card>
         ) : null}
-        {!isStudent ? (
-          <Card style={{ padding: 16 }}>
-            <Muted>{t.gradeOnWeb}</Muted>
-          </Card>
+        {!isStudent && !isQuiz ? (
+          <Button title={t.gradeWork} onPress={() => router.push({ pathname: '/grade/[id]', params: { id: assignment.id } })} />
         ) : null}
       </Screen>
     </>

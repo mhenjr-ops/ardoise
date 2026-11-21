@@ -34,10 +34,14 @@ check('2 conversations, 3 messages', (await n('select count(*) n from public.con
     where c.subject = 'Question sur le TP 1' and u.full_name = 'Brenda Fon'`);
   check('Brenda has an unread reply', unread[0]?.unread === true);
 }
-check('rubric attached to TP 1', (await n(`select count(*) n from public.assignments where rubric_id is not null`)) === 1);
+check('rubric attached to TP 1 and TP 3', (await n(`select count(*) n from public.assignments where rubric_id is not null`)) === 2);
+check('TP 3 is practice work (weight 0)', (await n(`select count(*) n from public.assignments where title like 'TP 3%' and weight = 0`)) === 1);
 check('6 attendance sessions, 30 records', (await n('select count(*) n from public.attendance_sessions')) === 6 && (await n('select count(*) n from public.attendance_records')) === 30);
 check('Yannick misses three sessions', (await n(`select count(*) n from public.attendance_records r join public.profiles p on p.id = r.student_id where p.email = 'yannick@demo.ardoise.cm' and r.status = 'absent'`)) === 3);
 check('sessions are in the past', (await n(`select count(*) n from public.attendance_sessions where starts_at > now()`)) === 0);
+check('three TP 3 hand-ins wait for grading', (await n(`select count(*) n from public.submissions s where not exists (
+  select 1 from public.grades g where g.assignment_id = s.assignment_id and g.student_id = s.student_id and g.score is not null)`)) === 3);
+check('hand-in times are spread out', (await n('select count(distinct submitted_at) n from public.submissions')) === (await n('select count(*) n from public.submissions')));
 check('notifications created (triggers + seeded)', (await n('select count(*) n from public.notifications')) > 20);
 check('syllabus written', (await n(`select count(*) n from public.courses where syllabus <> ''`)) === 2);
 await db.exec(engage);

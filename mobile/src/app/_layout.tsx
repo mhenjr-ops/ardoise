@@ -55,6 +55,7 @@ function RootStack() {
         <Stack.Screen name="inbox/[id]" options={{ title: '' }} />
         <Stack.Screen name="discussion/[id]" options={{ title: '' }} />
         <Stack.Screen name="notifications" options={{ title: '' }} />
+        <Stack.Screen name="grade/[id]" options={{ title: '' }} />
       </Stack>
     </>
   );

@@ -26,7 +26,7 @@ export default function TabsLayout() {
         tabBarLabelStyle: { fontFamily: fonts.bold, fontSize: 12, lineHeight: 16 },
         // Native tab bars size themselves around the safe area; the browser preview needs room for the labels.
         tabBarStyle: Platform.select({
-          web: { backgroundColor: colors.card, borderTopColor: colors.border, height: 62, paddingTop: 6, paddingBottom: 8 },
+          web: { backgroundColor: colors.card, borderTopColor: colors.border, height: 66, paddingTop: 4, paddingBottom: 6 },
           default: { backgroundColor: colors.card, borderTopColor: colors.border },
         }),
         sceneStyle: { backgroundColor: colors.bg },

@@ -10,7 +10,7 @@ declare
   u_brenda uuid; u_cedric uuid; u_mireille uuid; u_yannick uuid; u_ines uuid;
   students uuid[];
   monday timestamp;
-  tp1 uuid;
+  tp1 uuid; tp3 uuid; m2 uuid;
   rub uuid;
   topic1 uuid; topic2 uuid; r1 uuid;
   conv uuid;
@@ -128,6 +128,32 @@ begin
   values (v_inst, c_inf, tp1, u_brenda, rub,
     '{"c1":{"level":"l1","points":10,"comment":"Tous les cas passent."},"c2":{"level":"l2","points":3,"comment":"Ajoutez des commentaires."},"c3":{"level":"l2","points":2,"comment":""}}'::jsonb,
     u_mbarga);
+
+  -- A practice TP with three hand-ins waiting for the teacher, so SpeedGrader has work to show.
+  -- Weight 0: practice work doesn't count in the average (or in the jury's results).
+  insert into public.assignments (course_id, title, description, due_at, points_possible, component, weight, submission_types, created_by, rubric_id)
+  values (c_inf, 'TP 3 — Fonctions (entraînement)',
+    E'Écrivez une fonction moyenne(notes) qui renvoie la moyenne d''une liste de notes sur 20, puis testez-la sur trois notes saisies au clavier.',
+    now() + interval '2 days', 20, 'tp', 0, array['text', 'file'], u_mbarga, rub)
+  returning id into tp3;
+  select id into m2 from public.modules where course_id = c_inf and position = 2;
+  insert into public.module_items (module_id, item_type, title, assignment_id, position)
+  values (m2, 'assignment', 'TP 3 — Fonctions (entraînement)', tp3,
+          (select coalesce(max(position), 0) + 1 from public.module_items where module_id = m2));
+  insert into public.submissions (assignment_id, student_id, body) values
+    (tp3, u_cedric, E'def moyenne(notes):\n    return sum(notes) / len(notes)\n\nnotes = [float(input("Note : ")) for _ in range(3)]\nprint("Moyenne :", moyenne(notes))'),
+    (tp3, u_ines, E'def moyenne(notes):\n    if not notes:\n        return 0\n    return round(sum(notes) / len(notes), 2)\n\nnotes = []\nwhile len(notes) < 3:\n    n = float(input("Note (0-20) : "))\n    if 0 <= n <= 20:\n        notes.append(n)\nprint(moyenne(notes))'),
+    (tp3, u_mireille, E'def moyenne(a, b, c):\n    print((a + b + c) / 3)\n\nmoyenne(12, 15, 9)');
+  -- submitted_at is stamped by a trigger (also on update); pause it to spread these out.
+  alter table public.submissions disable trigger scope_submissions;
+  update public.submissions set submitted_at = now() - interval '26 hours' where assignment_id = tp3 and student_id = u_cedric;
+  update public.submissions set submitted_at = now() - interval '7 hours' where assignment_id = tp3 and student_id = u_ines;
+  update public.submissions set submitted_at = now() - interval '95 minutes' where assignment_id = tp3 and student_id = u_mireille;
+  alter table public.submissions enable trigger scope_submissions;
+  update public.notifications n set created_at = s.submitted_at
+  from public.submissions s
+  where n.kind = 'submission' and s.assignment_id = tp3 and s.student_id in (u_cedric, u_ines, u_mireille)
+    and n.data->>'student' = public.display_name(s.student_id);
 
   -- Attendance: six past sessions of INF101
   pattern := array['pppppp', 'ppppap', 'pppppp', 'apalap', 'pppppp']; -- one string per student, one letter per session
