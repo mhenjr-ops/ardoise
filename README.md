@@ -1,40 +1,43 @@
-# Ardoise LMS — sprint 2
+# Ardoise
 
-A Canvas-style learning platform for Cameroonian universities: a **web app** (Next.js), a **phone app** (Expo, Android first) and one **Supabase** backend. French and English, LMD marks out of 20, phone-photo submissions, quizzes, and the full LMD chain from a teacher's mark to a signed transcript.
+A learning platform for Cameroonian universities, in the spirit of Canvas and Blackboard: a **web app** (Next.js), a **phone app** (Expo, Android first) and one **Supabase** backend. French and English, LMD marks out of 20, phone-photo submissions, and the full LMD chain from a teacher's mark to a signed transcript.
+
+**Live demo:** https://ardoise-pi.vercel.app (one-tap demo accounts on the sign-in page) · phone app in the browser: https://ardoise-pi.vercel.app/app
 
 ```
 ardoise-lms/
 ├── supabase/
-│   ├── migrations/
-│   │   ├── 20261120000000_init.sql            # sprint 1: schools, courses, assignments, grades
-│   │   └── 20261121000000_quizzes_lmd.sql     # sprint 2: quizzes + LMD layer
-│   └── tests/                                 # 93 security/behaviour checks on a real Postgres engine
-├── web/       # Next.js 16 web app (all roles)
-└── mobile/    # Expo SDK 58 phone app (students + teachers)
+│   ├── migrations/   # run in filename order
+│   ├── seed/         # demo.sql, then demo-engage.sql
+│   └── tests/        # 189 security and behaviour checks on a real Postgres engine (PGlite)
+├── web/              # Next.js 16 web app (all roles); serves the phone preview at /app
+└── mobile/           # Expo SDK 58 phone app (students and teachers)
 ```
 
-## What's new in sprint 2
+## What's in it
 
-**Quizzes**
-- Question banks per course: single choice, multiple choice, true/false, short answer, numeric (with tolerance), essay.
-- Quizzes draw all questions or a random subset from a bank; shuffled questions and options; time limit; 1–10 attempts; answers shown after submitting, after the due date, or never.
-- Students take quizzes on the web **and on the phone**: autosave every change, a local copy that survives a dropped connection, a countdown on the server's clock, automatic submission when time runs out.
-- Auto-marking for everything but essays; teachers mark essays (or override any question) on the web. The best attempt goes to the gradebook, scaled to the assignment's points.
-- Answer keys live in a separate table students can never read; all student writes go through database functions.
+**Teaching**
+- Course home with what's next, syllabus, modules, pages, files, announcements.
+- Assignments (text, file or phone photo), quizzes from question banks (six question types, time limits, attempts, autosave that survives a dropped connection), rubrics.
+- **SpeedGrader** on the web and grading on the phone: one student after another, typed mark or rubric, comments.
+- Gradebook with a student **what-if** calculator; course dashboard (submission rates, averages, students at risk).
 
-**LMD layer** (Admin → Structure / Enrollments / Deliberations / Grading rules)
-- Faculties, departments, programmes (filières), academic years, semesters, teaching units (UE) with credits.
-- Each course is attached to a UE with a coefficient, plus optional per-course CC / TP / exam weights.
-- Students registered in a programme, year and level by pasting emails.
-- Grading rules per school: pass mark, compensation between UEs, elimination mark, resit replaces the exam or keeps the better mark, default component weights, maximum jury bonus.
-- **Deliberations**: compute → jury bonuses (logged with author and reason) → lock → publish. Locked results are frozen by the database; a published deliberation can't be reopened or deleted.
-- **Official minutes (PV) PDF**: one row per student, one column per UE, averages, credits, decisions, jury adjustments, signature blocks.
-- **Transcripts (relevés de notes) PDF** with a QR code. Anyone can scan it to open a public `/verify/<code>` page showing exactly what the transcript states.
-- Students see their published results on the web and on the phone.
+**School life**
+- Calendar and weekly timetable (classes, exams, office hours, holidays) in Cameroon time.
+- Inbox between students, teachers and the registrar's office; course discussions with pinned and closed topics.
+- Notifications for announcements, new work, marks, hand-ins, messages, replies and results.
+- **Attendance by code**: the teacher shows a 6-digit code, students check in from their phones; late and excused statuses; attendance matrix per course.
+
+**LMD and the registrar's office** (Admin)
+- Faculties, departments, programmes, years, semesters, teaching units (UE) with credits; courses attached to UEs with coefficients.
+- Grading rules per school; **deliberations** (compute → jury bonuses → lock → publish), official minutes (PV) PDF, **transcripts** with a QR code anyone can check at `/verify/<code>`.
+- Institution overview for admins.
+
+**Phone app**: home with stats and check-in, calendar, inbox, results, notifications, course modules, assignments with photo submission, quizzes, discussions, attendance (teachers run roll call), grading.
 
 ## How results are computed
 
-- **Course mark** = mix of components (CC, TP, exam), each the weighted average of its assignments scaled to /20. A missing mark counts as 0 within a component; a student with no mark at all in a course is *absent*. A graded resit replaces the exam, or the better of the two is kept, per the school's rule.
+- **Course mark** = mix of components (CC, TP, exam), each the weighted average of its assignments scaled to /20. A missing mark counts as 0 within a component; a student with no mark at all in a course is *absent*. Work with weight 0 (practice) doesn't count. A graded resit replaces the exam, or the better of the two is kept, per the school's rule.
 - **UE mark** = average of its courses weighted by coefficient, plus any jury bonus (capped by the rule).
 - **Semester average** = UE marks weighted by credits.
 - **Compensation**: when the semester average reaches the pass mark, failed UEs at or above the elimination mark count as validated.
@@ -45,64 +48,67 @@ The defaults (pass 10/20, compensation on, CC 30 / TP 20 / exam 50, jury bonus u
 ## 1. Supabase
 
 1. Create a project at supabase.com.
-2. **SQL Editor**: run `supabase/migrations/20261120000000_init.sql`, then `20261121000000_quizzes_lmd.sql`, in that order.
-   (Or with the CLI: `supabase link` then `supabase db push`.)
-   Already ran sprint 1? Run only the second file.
-3. **Authentication → URL Configuration**: Site URL = your web address; add `<site>/auth/callback` to Redirect URLs.
-4. Copy the project URL, publishable (or anon) key and service role key from **Settings → API**.
+2. **SQL Editor**: run every file in `supabase/migrations/` in filename order (or `supabase link` then `supabase db push`).
+3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`.
+4. **Authentication → URL Configuration**: Site URL = your web address (e.g. `https://ardoise-pi.vercel.app`); add `<site>/auth/callback` to Redirect URLs. Without this, sign-up and password emails point to localhost.
+5. Copy the project URL and publishable (or anon) key from **Settings → API**.
 
 ## 2. Web app
 
 ```bash
 cd ardoise-lms/web
 npm install
-cp .env.example .env.local     # Supabase URL + keys; NEXT_PUBLIC_SITE_URL once deployed
+cp .env.example .env.local     # Supabase URL + key; NEXT_PUBLIC_SITE_URL once deployed; DEMO_LOGINS=on for demos
 npm run dev                    # http://localhost:3000
-npm run seed                   # optional demo data (fresh project)
 ```
 
-Demo logins (password `Ardoise2026!`): `admin@demo.ardoise.cm` (admin + registrar), `j.mbarga@demo.ardoise.cm` (teacher), `brenda@demo.ardoise.cm`, `cedric@demo.ardoise.cm`, `yannick@demo.ardoise.cm` (students).
+Deploy on Vercel with **Root Directory** `web` and the same environment variables. `DEMO_LOGINS=on` shows one-tap demo accounts; leave it off for real schools.
 
-**Try the full LMD flow with the demo:**
-1. Admin → **Deliberations** → new: *Licence Informatique*, *S1 · 2026-2027*, level *L1*. Results compute at once: 3 *Admis*, 1 *Admis par compensation* (Cédric), 1 *Ajourné* (Yannick).
-2. Add a jury bonus (e.g. +0.5 on MAT112 for Yannick, with a reason) and watch it recompute.
-3. **Lock** → **Publish** → download the **PV** → **Issue transcripts**.
-4. Sign in as Cédric → **Results** → download the transcript → scan its QR code with a phone.
+Demo accounts (password `Ardoise2026!`): `admin@demo.ardoise.cm` (admin + registrar), `j.mbarga@demo.ardoise.cm` (teacher, INF101), `brenda@demo.ardoise.cm`, `cedric@demo.ardoise.cm`, `yannick@demo.ardoise.cm` (students).
 
-**Try a quiz:** sign in as Brenda → INF101 → *Quiz 1 — Bases de Python*. Then as the teacher, open the attempt and mark the essay question.
+**Things to try with the demo**
+- Teacher → INF101 → *TP 3 — Fonctions* → grade the three waiting hand-ins with the rubric.
+- Teacher → INF101 → Attendance → start roll call; as Brenda, type the code on the phone app's home screen.
+- Admin → Deliberations → new: *Licence Informatique*, *S1 · 2026-2027*, level *L1* → lock → publish → PV → transcripts. Then as Cédric → Results → scan the transcript's QR code.
+- Brenda → INF101 → *Quiz 1 — Bases de Python*.
 
 ## 3. Phone app
 
 ```bash
 cd ardoise-lms/mobile
 npm install
-cp .env.example .env           # same Supabase URL + key; EXPO_PUBLIC_WEB_URL optional
+cp .env.example .env           # same Supabase URL + key; EXPO_PUBLIC_WEB_URL; EXPO_PUBLIC_DEMO=on for demos
 npx expo start                 # scan with Expo Go
 ```
 
-## Checks that were run
+**Browser preview** (what runs at `/app`): `./scripts/export-web.sh` with the same `EXPO_PUBLIC_*` values builds the app for the browser and copies it to `web/public/app`; commit and deploy the web app.
+
+Store builds go through EAS (`npx eas-cli@latest build`), configured in `app.json`.
+
+## Checks
 
 | Check | Result |
 | --- | --- |
-| `supabase/tests`: `npm install && npm test` (both migrations on PGlite, a real Postgres engine) | 93 checks pass: school isolation, answer keys hidden, quiz marking, best-attempt rule, time limit, locked/published deliberations, transcript verification |
-| `web`: `npm test` (LMD engine) | 19 tests pass, including the demo semester's expected outcome |
-| `web`: `npm run typecheck`, `npm run lint`, `npm run build` | clean (29 routes) |
-| `mobile`: `npm run typecheck`, `npm run lint`, `npx expo export --platform android` | clean |
-| PV and transcript PDFs | rendered and checked by eye; the marks were verified by hand |
+| `supabase/tests`: `npm install && npm test` (all migrations and both seeds on PGlite) | 189 checks pass: school isolation, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
+| `web`: `npm test` (LMD engine) | 19 tests pass |
+| `web`: `npx tsc --noEmit`, `npm run lint`, `npm run build` | clean |
+| `mobile`: `npx tsc --noEmit`, `npx expo lint`, `npx expo export` (Android and web) | clean |
+| Live demo (Supabase + Vercel) | web checked as admin, teacher and student; phone preview checked as student and teacher |
 
-Not yet done: a run against a live Supabase project and on a physical phone. Do that first with the seed data.
+Not yet done: a run on a physical Android phone.
 
-## Known limits (next sprint)
+## Known limits
 
-- **Second session (rattrapage) deliberation**: there is one deliberation per programme, semester and level, and a published one is final. A separate session-2 deliberation comes next.
-- Multiple-choice questions are all-or-nothing (no partial credit).
-- Editing a question's answer key does not re-mark past attempts.
-- Programmes, years and semesters can't be deleted from the UI (they anchor official records); teaching units can be, while no course is attached.
+- **Second session (rattrapage) deliberation**: one deliberation per programme, semester and level, and a published one is final. A separate session-2 deliberation comes next.
+- Notifications are in-app only; push, SMS and WhatsApp come next.
+- Multiple-choice questions are all-or-nothing; editing an answer key doesn't re-mark past attempts.
 - PDFs use the standard Latin-1 fonts: French accents work, other scripts are replaced.
-- Still to come from the plan: inbox and notifications (push, SMS/WhatsApp), mobile-money billing, iOS build, offline course downloads.
+- Still to come: mobile-money billing, iOS build, offline course downloads.
 
-## Earlier decisions
+## Decisions
 
-- Next.js 16 **Cache Components is off** (every page reads the session); turning it on means wrapping session reads in `<Suspense>`.
-- System fonts only (fast on slow connections); phone photos compressed before upload; 10 MB file cap; dates in Cameroon time (WAT).
+- Look: "Terroir" — slate, chalk, ochre and terracotta, Alegreya and Alegreya Sans, Ndop-inspired patterns. Fonts ship with the apps (no font CDN on slow connections).
+- Next.js 16 **Cache Components is off** (every page reads the session).
+- Phone photos compressed before upload; 10 MB file cap; dates in Cameroon time (WAT).
+- Posts, messages and hand-ins are timestamped by the database, not the client.
 - **Data protection (Law No. 2024/017)**: get local counsel on hosting region and prior authorisation before the first pilot.

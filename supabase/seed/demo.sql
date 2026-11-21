@@ -1,11 +1,9 @@
 -- Ardoise demo data: one institution, 3 courses, 2 teachers, 5 students,
 -- modules, pages, assignments, a full semester of marks and a quiz.
 --
--- Run once, after both migrations, in the Supabase SQL editor (or through the
--- Supabase connector). It runs as the database owner, so it creates the login
--- accounts directly. Password for every account: Ardoise2026!
---
--- Same data as web/scripts/seed-demo.mjs; use whichever is handier.
+-- Run once, after all migrations, in the Supabase SQL editor (or through the
+-- Supabase connector), then run demo-engage.sql. It runs as the database owner,
+-- so it creates the login accounts directly. Password for every account: Ardoise2026!
 
 do $seed$
 declare
