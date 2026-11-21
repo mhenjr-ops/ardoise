@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Redirect, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Text } from '@/components/text';
 import { Badge, Button, Card, Empty, Loading, Muted, Screen, colors, styles as ui } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatScore, useI18n } from '@/lib/i18n';
@@ -343,14 +344,14 @@ const s = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   timer: {
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F1E9DC',
     color: colors.text,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -367,11 +368,11 @@ const s = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: '#fff',
+    backgroundColor: colors.card,
     minHeight: 52,
   },
   optionOn: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#94A3B8' },
-  check: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: '#94A3B8' },
+  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#A8977D' },
+  check: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: '#A8977D' },
   markOn: { borderColor: colors.brand, backgroundColor: colors.brand },
 });

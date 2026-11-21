@@ -8,7 +8,7 @@
     "scheme": "ardoise",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "cm.ardoise.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Ardoise uses the camera so you can photograph handwritten work and submit it.",
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#16202C",
+        "backgroundColor": "#1F3B36",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -27,16 +27,19 @@
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Ardoise",
+      "themeColor": "#1F3B36",
+      "backgroundColor": "#F4EDE1"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#16202C",
+          "backgroundColor": "#1F3B36",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 120
         }
       ],
       [
@@ -49,7 +52,8 @@
     ],
     "experiments": {
       "typedRoutes": false,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "baseUrl": "/app"
     }
   }
 }

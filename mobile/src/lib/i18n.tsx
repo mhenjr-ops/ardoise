@@ -94,6 +94,87 @@ const fr = {
   decisions: { admitted: 'Admis', admitted_compensation: 'Admis par compensation', resit: 'Ajourné (rattrapage)', incomplete: 'Incomplet' },
   ueStatus: { validated: 'Validée', compensated: 'Compensée', failed: 'Non validée', incomplete: 'Incomplète' },
   openTranscript: 'Relevé de notes (PDF sur le web)',
+  tabHome: 'Accueil',
+  tabAgenda: 'Agenda',
+  tabInbox: 'Messages',
+  tabResults: 'Résultats',
+  notifications: 'Notifications',
+  markAllRead: 'Tout marquer comme lu',
+  noNotifications: 'Vous êtes à jour.',
+  goodMorning: 'Bonjour',
+  goodEvening: 'Bonsoir',
+  statAverage: 'Moyenne',
+  statAttendance: 'Assiduité',
+  statDue: 'À rendre',
+  checkInTitle: 'Je suis en cours',
+  checkInHelp: 'Saisissez le code affiché par votre enseignant.',
+  checkIn: 'Valider',
+  checkedIn: 'Présence enregistrée : {status} ({course}).',
+  invalidCode: 'Code invalide ou expiré.',
+  tooMany: 'Trop d\'essais. Réessayez dans quelques minutes.',
+  statuses: { present: 'Présent', late: 'En retard', absent: 'Absent', excused: 'Excusé' },
+  today: "Aujourd'hui",
+  nothingToday: "Pas de cours aujourd'hui.",
+  noEvents: 'Rien de prévu ces deux prochaines semaines.',
+  inboxEmpty: 'Aucune conversation pour le moment.',
+  replyPlaceholder: 'Écrire une réponse…',
+  send: 'Envoyer',
+  you: 'Vous',
+  noSubject: '(sans objet)',
+  discussions: 'Discussions',
+  noTopics: 'Aucun sujet pour le moment.',
+  replies: 'réponses',
+  pinned: 'Épinglé',
+  locked: 'Fermé',
+  lockedNote: 'Ce sujet est fermé aux nouvelles réponses.',
+  reply: 'Répondre',
+  overdue: 'En retard',
+  dueToday: "Aujourd'hui",
+  dueTomorrow: 'Demain',
+  dueInDays: 'Dans {n} j',
+  done: 'rendus',
+  statCourses: 'Cours',
+  statToGrade: 'À corriger',
+  account: 'Compte',
+  language: 'Langue',
+  newMessage: 'Nouveau message',
+  to: 'À',
+  subject: 'Objet',
+  searchPeople: 'Chercher une personne ou un cours',
+  office: 'Scolarité',
+  noContacts: 'Personne ne correspond.',
+  pickRecipient: 'Choisissez au moins un destinataire et écrivez un message.',
+  newTopic: 'Nouveau sujet',
+  topicTitle: 'Titre du sujet',
+  topicBody: 'Votre question ou idée',
+  open: 'Ouvrir',
+  weekOf: 'Semaine du {date}',
+  kinds: { class: 'Cours', exam: 'Examen', event: 'Évènement', office_hours: 'Permanence', holiday: 'Congé' },
+  dueAt: 'À rendre · {course}',
+  attendanceRate: '{n} % de présence',
+  attendanceTab: 'Présences',
+  startCheckIn: "Lancer l'appel (10 min)",
+  codeValidUntil: "Code valable jusqu'à {time}",
+  checkedInCount: '{n} sur {total} présents',
+  closeCheckIn: "Clôturer l'appel",
+  refresh: 'Actualiser',
+  noSessions: 'Aucun appel pour le moment.',
+  showCode: 'Affichez ce code au tableau.',
+  lastActivity: 'Activité {when}',
+  tryDemo: 'Essayer la démo, sans compte',
+  asStudent: 'Comme étudiant',
+  asTeacher: 'Comme enseignant',
+  or: 'ou',
+  notif: {
+    announcement: '{course} · Nouvelle annonce : {title}',
+    assignment: '{course} · Nouveau devoir : {title}',
+    grade: '{course} · Note publiée pour « {title} » : {score}/{points}',
+    submission: '{course} · {student} a rendu « {title} »',
+    message: '{sender} vous a écrit : {subject}',
+    discussion: '{course} · {author} a répondu dans « {title} »',
+    results: 'Résultats publiés : {programme}, {semester}',
+    attendance: '{course} · Appel enregistré',
+  },
 };
 
 type Dict = typeof fr;
@@ -189,6 +270,87 @@ const en: Dict = {
   decisions: { admitted: 'Passed', admitted_compensation: 'Passed by compensation', resit: 'Deferred (resit)', incomplete: 'Incomplete' },
   ueStatus: { validated: 'Validated', compensated: 'Compensated', failed: 'Not validated', incomplete: 'Incomplete' },
   openTranscript: 'Transcript (PDF on the web)',
+  tabHome: 'Home',
+  tabAgenda: 'Calendar',
+  tabInbox: 'Inbox',
+  tabResults: 'Results',
+  notifications: 'Notifications',
+  markAllRead: 'Mark all as read',
+  noNotifications: "You're all caught up.",
+  goodMorning: 'Good morning',
+  goodEvening: 'Good evening',
+  statAverage: 'Average',
+  statAttendance: 'Attendance',
+  statDue: 'Due',
+  checkInTitle: "I'm in class",
+  checkInHelp: 'Type the code your teacher is showing.',
+  checkIn: 'Check in',
+  checkedIn: 'Checked in: {status} ({course}).',
+  invalidCode: 'Invalid or expired code.',
+  tooMany: 'Too many tries. Try again in a few minutes.',
+  statuses: { present: 'Present', late: 'Late', absent: 'Absent', excused: 'Excused' },
+  today: 'Today',
+  nothingToday: 'No classes today.',
+  noEvents: 'Nothing planned in the next two weeks.',
+  inboxEmpty: 'No conversations yet.',
+  replyPlaceholder: 'Write a reply…',
+  send: 'Send',
+  you: 'You',
+  noSubject: '(no subject)',
+  discussions: 'Discussions',
+  noTopics: 'No topics yet.',
+  replies: 'replies',
+  pinned: 'Pinned',
+  locked: 'Closed',
+  lockedNote: 'This topic is closed to new replies.',
+  reply: 'Reply',
+  overdue: 'Overdue',
+  dueToday: 'Today',
+  dueTomorrow: 'Tomorrow',
+  dueInDays: 'In {n} d',
+  done: 'handed in',
+  statCourses: 'Courses',
+  statToGrade: 'To grade',
+  account: 'Account',
+  language: 'Language',
+  newMessage: 'New message',
+  to: 'To',
+  subject: 'Subject',
+  searchPeople: 'Search for a person or a course',
+  office: 'Registrar',
+  noContacts: 'No one matches.',
+  pickRecipient: 'Pick at least one recipient and write a message.',
+  newTopic: 'New topic',
+  topicTitle: 'Topic title',
+  topicBody: 'Your question or idea',
+  open: 'Open',
+  weekOf: 'Week of {date}',
+  kinds: { class: 'Class', exam: 'Exam', event: 'Event', office_hours: 'Office hours', holiday: 'Holiday' },
+  dueAt: 'Due · {course}',
+  attendanceRate: '{n}% attendance',
+  attendanceTab: 'Attendance',
+  startCheckIn: 'Start roll call (10 min)',
+  codeValidUntil: 'Code valid until {time}',
+  checkedInCount: '{n} of {total} present',
+  closeCheckIn: 'Close roll call',
+  refresh: 'Refresh',
+  noSessions: 'No roll call yet.',
+  showCode: 'Show this code on the board.',
+  lastActivity: 'Active {when}',
+  tryDemo: 'Try the demo, no account needed',
+  asStudent: 'As a student',
+  asTeacher: 'As a teacher',
+  or: 'or',
+  notif: {
+    announcement: '{course} · New announcement: {title}',
+    assignment: '{course} · New assignment: {title}',
+    grade: '{course} · Mark posted for “{title}”: {score}/{points}',
+    submission: '{course} · {student} handed in “{title}”',
+    message: '{sender} wrote to you: {subject}',
+    discussion: '{course} · {author} replied in “{title}”',
+    results: 'Results published: {programme}, {semester}',
+    attendance: '{course} · Attendance recorded',
+  },
 };
 
 const dictionaries: Record<Locale, Dict> = { fr, en };
@@ -246,4 +408,36 @@ export function formatScore(locale: Locale, value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   const rounded = Math.round(Number(value) * 100) / 100;
   return locale === 'fr' ? String(rounded).replace('.', ',') : String(rounded);
+}
+
+/** Fills {placeholders} in a template. */
+export function fmt(template: string, vars: Record<string, string | number | null | undefined>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => {
+    const v = vars[key];
+    return v === null || v === undefined ? '' : String(v);
+  });
+}
+
+export function formatTime(locale: Locale, iso: string) {
+  return new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Douala' }).format(new Date(iso));
+}
+
+/** "2026-11-21" as seen in Cameroon (UTC+1, no DST). */
+export function watDayKey(input: string | number | Date): string {
+  return new Date(new Date(input).getTime() + 3600000).toISOString().slice(0, 10);
+}
+
+export function formatDay(locale: Locale, dayKey: string, opts: Intl.DateTimeFormatOptions) {
+  const s = new Intl.DateTimeFormat(locale === 'fr' ? 'fr-FR' : 'en-GB', { ...opts, timeZone: 'UTC' }).format(new Date(`${dayKey}T12:00:00Z`));
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function timeAgo(locale: Locale, iso: string, now: number): string {
+  const diff = Math.round((new Date(iso).getTime() - now) / 1000);
+  const rtf = new Intl.RelativeTimeFormat(locale === 'fr' ? 'fr' : 'en', { numeric: 'auto', style: 'short' });
+  const abs = Math.abs(diff);
+  if (abs < 60) return rtf.format(diff, 'second');
+  if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
+  if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
+  return rtf.format(Math.round(diff / 86400), 'day');
 }

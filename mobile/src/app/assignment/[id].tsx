@@ -3,7 +3,8 @@ import { File as FsFile } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/components/text';
 import { Badge, Button, Card, Empty, Input, Loading, Muted, Screen, colors, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDateTime, formatScore, useI18n } from '@/lib/i18n';
@@ -222,7 +223,7 @@ export default function AssignmentScreen() {
           </Text>
           {assignment.description ? (
             <View style={{ gap: 4, marginTop: 4 }}>
-              <Text style={{ fontWeight: '700', color: '#334155' }}>{t.instructions}</Text>
+              <Text style={{ fontWeight: '700', color: '#453D33' }}>{t.instructions}</Text>
               <Text style={styles.body} selectable>
                 {assignment.description}
               </Text>
@@ -231,7 +232,7 @@ export default function AssignmentScreen() {
         </Card>
 
         {isStudent && grade && grade.score !== null ? (
-          <Card style={{ padding: 16, gap: 6, backgroundColor: colors.brandSoft, borderColor: '#94D2C0' }}>
+          <Card style={{ padding: 16, gap: 6, backgroundColor: colors.brandSoft, borderColor: '#C7DAD2' }}>
             <Text style={{ color: colors.brandDark, fontWeight: '600' }}>{t.yourGrade}</Text>
             <Text style={{ color: colors.brandDark, fontSize: 32, fontWeight: '700' }}>
               {formatScore(locale, grade.score)}
@@ -347,6 +348,6 @@ const s = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderRadius: 10,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F1E9DC',
   },
 });

@@ -117,6 +117,17 @@ export default async function Landing() {
                   {L.ctaSignIn}
                 </Link>
               ) : null}
+              {/* Plain <a>: /app is the exported phone app, not a Next.js route. */}
+              <a
+                href="/app"
+                className="inline-flex h-12 items-center gap-2 rounded-[10px] px-4 text-base font-semibold text-ochre-300 hover:bg-white/10"
+              >
+                <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
+                  <path d="M11 18.5h2" />
+                </svg>
+                {L.ctaPhone}
+              </a>
             </div>
             <ul className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-[14.5px] text-chalk/70">
               {[L.proofLmd, L.proofBilingual, L.proofPhone, L.proofData].map((p) => (

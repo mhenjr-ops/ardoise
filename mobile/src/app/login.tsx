@@ -1,11 +1,17 @@
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Input, colors } from '@/components/ui';
+import { LogoMark, NdopPattern } from '@/components/ndop';
+import { Text } from '@/components/text';
+import { Button, Input, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { isConfigured, supabase } from '@/lib/supabase';
+
+const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? '';
+// Demo buttons only in builds made for showing Ardoise (EXPO_PUBLIC_DEMO=on).
+const DEMO = process.env.EXPO_PUBLIC_DEMO === 'on' && WEB_URL.startsWith('http');
 
 export default function LoginScreen() {
   const { session } = useAuth();
@@ -14,8 +20,29 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoBusy, setDemoBusy] = useState<'student' | 'teacher' | null>(null);
 
   if (session) return <Redirect href="/" />;
+
+  async function demo(role: 'student' | 'teacher') {
+    setError(null);
+    setDemoBusy(role);
+    try {
+      const res = await fetch(`${WEB_URL}/api/demo-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      const tokens = (await res.json()) as { access_token?: string; refresh_token?: string };
+      if (!res.ok || !tokens.access_token || !tokens.refresh_token) throw new Error('demo');
+      const { error: e } = await supabase.auth.setSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token });
+      if (e) throw e;
+    } catch {
+      setError(t.error);
+    } finally {
+      setDemoBusy(null);
+    }
+  }
 
   async function onSubmit() {
     setError(null);
@@ -26,21 +53,24 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.board }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.board }} edges={['top']}>
+      <NdopPattern opacity={0.1} size={96} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={s.hero}>
             <View style={s.topRow}>
-              <View style={s.logo}>
-                <Text style={s.logoText}>A</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <LogoMark size={44} />
+                <Text style={s.word}>Ardoise</Text>
               </View>
-              <Pressable onPress={() => setLocale(locale === 'fr' ? 'en' : 'fr')} hitSlop={12}>
-                <Text style={s.lang}>
-                  {locale.toUpperCase()} → {(locale === 'fr' ? 'en' : 'fr').toUpperCase()}
-                </Text>
-              </Pressable>
+              <View style={s.segment}>
+                {(['fr', 'en'] as const).map((l) => (
+                  <Pressable key={l} onPress={() => setLocale(l)} style={[s.segItem, locale === l && s.segOn]} hitSlop={6}>
+                    <Text style={[s.segText, locale === l && { color: colors.board }]}>{l.toUpperCase()}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-            <Text style={s.brand}>Ardoise</Text>
             <Text style={s.tagline}>{t.tagline}</Text>
           </View>
 
@@ -66,6 +96,19 @@ export default function LoginScreen() {
             />
             {error ? <Text style={s.error}>{error}</Text> : null}
             <Button title={t.signIn} onPress={onSubmit} loading={busy} disabled={!email || !password || !isConfigured} />
+            {DEMO && isConfigured ? (
+              <View style={s.demo}>
+                <Text style={s.demoTitle}>{t.tryDemo}</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1 }}>
+                    <Button title={t.asStudent} variant="accent" onPress={() => demo('student')} loading={demoBusy === 'student'} disabled={!!demoBusy} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button title={t.asTeacher} variant="secondary" onPress={() => demo('teacher')} loading={demoBusy === 'teacher'} disabled={!!demoBusy} />
+                  </View>
+                </View>
+              </View>
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -74,21 +117,24 @@ export default function LoginScreen() {
 }
 
 const s = StyleSheet.create({
-  hero: { padding: 24, paddingTop: 16, gap: 10 },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  logo: { width: 44, height: 44, borderRadius: 10, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
-  logoText: { color: '#fff', fontSize: 20, fontWeight: '700' },
-  lang: { color: '#CBD5E1', fontWeight: '700', fontSize: 13 },
-  brand: { color: colors.chalk, fontSize: 34, fontWeight: '700' },
-  tagline: { color: '#CBD5E1', fontSize: 16, lineHeight: 23 },
+  hero: { padding: 24, paddingTop: 20, gap: 28, minHeight: 300, justifyContent: 'space-between' },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  word: { color: colors.chalk, fontFamily: fonts.displayBold, fontSize: 26 },
+  tagline: { color: colors.chalk, fontFamily: fonts.display, fontSize: 30, lineHeight: 38, marginBottom: 8 },
+  segment: { flexDirection: 'row', backgroundColor: 'rgba(248,243,234,0.1)', borderRadius: 10, padding: 3 },
+  segItem: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  segOn: { backgroundColor: colors.chalk },
+  segText: { color: 'rgba(248,243,234,0.8)', fontFamily: fonts.bold, fontSize: 13.5 },
   sheet: {
     flex: 1,
     backgroundColor: colors.bg,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 24,
+    paddingTop: 28,
     gap: 16,
-    marginTop: 24,
   },
-  error: { color: colors.danger, fontSize: 14 },
+  error: { color: colors.danger, fontSize: 15, fontFamily: fonts.bold },
+  demo: { marginTop: 8, paddingTop: 18, borderTopWidth: 1, borderTopColor: colors.border, gap: 10 },
+  demoTitle: { fontFamily: fonts.bold, color: colors.muted, fontSize: 15, textAlign: 'center' },
 });

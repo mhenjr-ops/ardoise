@@ -12,6 +12,17 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  // The phone app's web preview is a single-page app exported to public/app.
+  async rewrites() {
+    return {
+      beforeFiles: [],
+      afterFiles: [],
+      fallback: [
+        { source: "/app", destination: "/app/index.html" },
+        { source: "/app/:path*", destination: "/app/index.html" },
+      ],
+    };
+  },
   experimental: {
     serverActions: {
       // Student uploads go straight to Supabase Storage from the browser;

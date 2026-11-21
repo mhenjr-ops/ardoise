@@ -1,6 +1,7 @@
 import { Redirect, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Text } from 'react-native';
+
+import { Text } from '@/components/text';
 import { Card, Empty, Loading, Muted, Screen, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDateTime, useI18n } from '@/lib/i18n';

@@ -1,7 +1,11 @@
 import { Redirect, Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Badge, Button, Card, Empty, Input, Loading, Muted, Row, Screen, colors } from '@/components/ui';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { CourseAttendance } from '@/components/course/attendance';
+import { CourseDiscussions } from '@/components/course/discussions';
+import { NdopPattern } from '@/components/ndop';
+import { Text } from '@/components/text';
+import { Badge, Button, Card, Empty, Input, Loading, Lozenge, Muted, Row, Screen, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { formatDateTime, formatScore, useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
@@ -16,7 +20,7 @@ import {
   type ModuleRow,
 } from '@/lib/types';
 
-type Tab = 'modules' | 'announcements' | 'assignments' | 'grades';
+type Tab = 'modules' | 'announcements' | 'assignments' | 'discussions' | 'attendance' | 'grades';
 
 type Data = {
   course: Course;
@@ -123,7 +127,9 @@ export default function CourseScreen() {
     { key: 'modules', label: t.modules },
     { key: 'announcements', label: t.announcements },
     { key: 'assignments', label: t.assignments },
-    { key: 'grades', label: t.grades },
+    { key: 'discussions', label: t.discussions },
+    { key: 'attendance', label: t.attendanceTab },
+    ...(data.isStaff ? [] : [{ key: 'grades' as Tab, label: t.grades }]),
   ];
 
   const average = weightedAverage(data.assignments, data.grades, userId ?? '');
@@ -140,14 +146,22 @@ export default function CourseScreen() {
         }}
       >
         <View style={[s.banner, { backgroundColor: course.color }]}>
-          <Text style={s.bannerCode}>
-            {course.code}
-            {course.level ? ` · ${course.level}` : ''}
-          </Text>
+          <NdopPattern opacity={0.18} size={76} />
+          <View style={s.codePill}>
+            <Text style={s.bannerCode}>
+              {course.code}
+              {course.level ? ` · ${course.level}` : ''}
+            </Text>
+          </View>
           <Text style={s.bannerTitle}>{course.title}</Text>
+          {data.role === 'student' && average !== null ? (
+            <Text style={s.bannerMeta}>
+              {t.average} {formatScore(locale, average)}/20
+            </Text>
+          ) : null}
         </View>
 
-        <View style={s.tabs}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabs} style={{ marginHorizontal: -16 }}>
           {tabs.map((tb) => (
             <Pressable key={tb.key} onPress={() => setTab(tb.key)} style={[s.tab, tab === tb.key && s.tabActive]}>
               <Text style={[s.tabText, tab === tb.key && s.tabTextActive]} numberOfLines={1}>
@@ -155,7 +169,10 @@ export default function CourseScreen() {
               </Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
+
+        {tab === 'discussions' ? <CourseDiscussions courseId={course.id} /> : null}
+        {tab === 'attendance' && userId ? <CourseAttendance courseId={course.id} isStaff={data.isStaff} userId={userId} /> : null}
 
         {tab === 'modules' ? (
           data.modules.length === 0 ? (
@@ -175,10 +192,14 @@ export default function CourseScreen() {
                       </Text>
                     ) : (
                       <Row key={item.id} onPress={() => openItem(item)}>
-                        <Text style={s.itemTitle}>
-                          {item.item_type === 'assignment' ? '✎ ' : item.item_type === 'link' ? '↗ ' : '▤ '}
-                          {item.title}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <Lozenge
+                            color={item.item_type === 'assignment' ? colors.ochre : item.item_type === 'link' ? colors.info : course.color}
+                            size={7}
+                          />
+                          <Text style={[s.itemTitle, { flex: 1 }]}>{item.title}</Text>
+                          {item.item_type === 'link' ? <Text style={{ color: colors.muted }}>↗</Text> : null}
+                        </View>
                       </Row>
                     ),
                   )}
@@ -222,7 +243,7 @@ export default function CourseScreen() {
                 return (
                   <Row key={a.id} onPress={() => router.push({ pathname: '/assignment/[id]', params: { id: a.id } })}>
                     <Text style={s.itemTitle}>{a.title}</Text>
-                    <Text style={{ color: colors.muted, fontSize: 13 }}>
+                    <Text style={{ color: colors.muted, fontSize: 14.5, fontFamily: fonts.body }}>
                       {a.due_at ? `${t.due} ${formatDateTime(locale, a.due_at)}` : t.noDue}
                     </Text>
                     <View style={{ flexDirection: 'row', gap: 6, marginTop: 4 }}>
@@ -258,7 +279,7 @@ export default function CourseScreen() {
                 </View>
                 <Text style={s.average}>
                   {formatScore(locale, average)}
-                  <Text style={{ fontSize: 16, color: colors.muted }}>/20</Text>
+                  <Text style={{ fontSize: 16, color: colors.muted, fontFamily: fonts.medium }}>/20</Text>
                 </Text>
               </Card>
               <Card>
@@ -288,19 +309,21 @@ export default function CourseScreen() {
 }
 
 const s = StyleSheet.create({
-  banner: { borderRadius: 14, padding: 16, gap: 4 },
-  bannerCode: { color: 'rgba(255,255,255,0.85)', fontWeight: '700', fontSize: 12, letterSpacing: 0.5 },
-  bannerTitle: { color: '#fff', fontWeight: '700', fontSize: 20 },
-  tabs: { flexDirection: 'row', backgroundColor: '#E2E8F0', borderRadius: 12, padding: 4, gap: 4 },
-  tab: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
-  tabActive: { backgroundColor: '#fff' },
-  tabText: { fontSize: 13, fontWeight: '600', color: colors.muted },
-  tabTextActive: { color: colors.brandDark },
-  moduleHeader: { backgroundColor: '#F8FAFC', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  moduleTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
-  subHeader: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4, fontSize: 12, fontWeight: '700', color: colors.muted, textTransform: 'uppercase' },
-  itemTitle: { fontSize: 15, fontWeight: '600', color: colors.text },
-  body: { fontSize: 15, color: colors.text, lineHeight: 22 },
-  average: { fontSize: 30, fontWeight: '700', color: colors.text },
-  score: { fontSize: 15, fontWeight: '700', color: colors.text },
+  banner: { borderRadius: 22, padding: 18, gap: 8, overflow: 'hidden', minHeight: 140, justifyContent: 'flex-end' },
+  codePill: { alignSelf: 'flex-start', backgroundColor: 'rgba(18,16,12,0.32)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  bannerCode: { color: colors.chalk, fontFamily: fonts.heavy, fontSize: 13, letterSpacing: 0.4 },
+  bannerTitle: { color: colors.chalk, fontFamily: fonts.display, fontSize: 26, lineHeight: 32 },
+  bannerMeta: { color: 'rgba(248,243,234,0.85)', fontFamily: fonts.bold, fontSize: 15 },
+  tabs: { paddingHorizontal: 16, gap: 8 },
+  tab: { paddingVertical: 9, paddingHorizontal: 16, borderRadius: 999, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border },
+  tabActive: { backgroundColor: colors.board, borderColor: colors.board },
+  tabText: { fontSize: 15, fontFamily: fonts.bold, color: '#453D33' },
+  tabTextActive: { color: colors.chalk },
+  moduleHeader: { backgroundColor: '#FAF6EF', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  moduleTitle: { fontSize: 18, fontFamily: fonts.display, color: colors.text },
+  subHeader: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4, fontSize: 14, fontFamily: fonts.bold, color: colors.muted },
+  itemTitle: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
+  body: { fontSize: 16, color: colors.text, lineHeight: 24, fontFamily: fonts.body },
+  average: { fontSize: 34, fontFamily: fonts.displayBold, color: colors.text },
+  score: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
 });
