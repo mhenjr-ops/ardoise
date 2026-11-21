@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #e8f5f1;
+  --color-brand-100: #c7e8de;
+  --color-brand-200: #94d2c0;
+  --color-brand-500: #12907a;
+  --color-brand-600: #0e7c66;
+  --color-brand-700: #0b6352;
+  --color-brand-800: #094d40;
+  --color-slate-board: #16202c;
+  --color-chalk: #f7f3e8;
+  --color-chalk-yellow: #f2c14e;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: #f6f7f9;
+  color: #0f172a;
+  font-family: var(--font-sans);
+}
+
+/* Readable long-form text for pages, announcements and descriptions */
+.prose-lite {
+  white-space: pre-wrap;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}

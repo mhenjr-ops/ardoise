@@ -1,0 +1,11 @@
+{
+  "name": "ardoise-db-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node rls.test.mjs && node quiz-lmd.test.mjs && node seed.test.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.17"
+  }
+}
