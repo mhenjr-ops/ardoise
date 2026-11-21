@@ -30,7 +30,7 @@ export async function createCourse(formData: FormData) {
   const code = String(formData.get("code") ?? "").trim().toUpperCase();
   const title = String(formData.get("title") ?? "").trim();
   const level = String(formData.get("level") ?? "").trim() || null;
-  const language = formData.get("language") === "en" ? "en" : "fr";
+  const language = formData.get("language") === "fr" ? "fr" : "en";
   const teacherEmail = String(formData.get("teacher_email") ?? "").trim();
   if (!code || !title) redirect("/admin?error=invalid");
 

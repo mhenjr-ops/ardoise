@@ -386,19 +386,14 @@ const en: Dict = {
 const dictionaries: Record<Locale, Dict> = { fr, en };
 const STORAGE_KEY = 'ardoise_locale';
 
-function deviceLocale(): Locale {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().startsWith('en') ? 'en' : 'fr';
-  } catch {
-    return 'fr';
-  }
-}
+// English by default; the choice a user makes (Account → Language) is remembered.
+const DEFAULT_LOCALE: Locale = 'en';
 
 type I18nValue = { locale: Locale; t: Dict; setLocale: (l: Locale) => void };
 const I18nContext = createContext<I18nValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(deviceLocale());
+  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((saved) => {
