@@ -8,7 +8,8 @@ import { daysFromNowIso, formatScore, nowMs } from "@/lib/format";
 import { weightedAverage } from "@/lib/grades";
 import { addDays, daysUntil, EVENT_COLORS, expandEvents, formatDayLabel, formatTime, watDayKey, watDayStart } from "@/lib/calendar";
 import { notificationText, timeAgo } from "@/lib/notifications";
-import { Card, CardHeader, Empty, Stat } from "@/components/ui";
+import { Card, CardHeader, Empty } from "@/components/ui";
+import { NDOP_CHALK } from "@/lib/ndop";
 import { CourseCard } from "@/components/course/course-card";
 import type { AppNotification, CalendarEvent, Course, CourseRole } from "@/lib/types";
 
@@ -108,12 +109,12 @@ export default async function DashboardPage() {
   const toGrade = new Map<string, number>();
   let studentCount = 0;
   if (staffIds.length) {
-    const [{ data: subs }, { data: staffGrades }, { count }] = await Promise.all([
+    const [{ data: subs }, { data: staffGrades }, { data: studentRows }] = await Promise.all([
       supabase.from("submissions").select("course_id, assignment_id, student_id").in("course_id", staffIds),
       supabase.from("grades").select("assignment_id, student_id, score").in("course_id", staffIds),
-      supabase.from("enrollments").select("user_id", { count: "exact", head: true }).in("course_id", staffIds).eq("role", "student"),
+      supabase.from("enrollments").select("user_id").in("course_id", staffIds).eq("role", "student"),
     ]);
-    studentCount = count ?? 0;
+    studentCount = new Set((studentRows ?? []).map((r: { user_id: string }) => r.user_id)).size;
     const graded = new Set(
       (staffGrades ?? [])
         .filter((g: { score: number | null }) => g.score !== null)
@@ -130,6 +131,29 @@ export default async function DashboardPage() {
   const firstName = (profile.full_name || "").replace(/^(Dr|Pr|M\.|Mme)\s+/i, "").split(" ")[0];
   const isStudent = studentIds.length > 0 && staffIds.length === 0;
 
+  const stats: Array<{ label: string; value: string | number; tone: string; suffix?: string }> = isStudent
+    ? [
+        {
+          label: t.dash.statAverage,
+          value: overall === null ? "—" : formatScore(locale, Math.round(overall * 100) / 100),
+          suffix: "/20",
+          tone: overall !== null && overall < 10 ? "text-terracotta-300" : "text-chalk",
+        },
+        {
+          label: t.dash.statAttendance,
+          value: attendanceRate === null ? "—" : `${Math.round(attendanceRate * 100)}%`,
+          tone: attendanceRate !== null && attendanceRate < 0.75 ? "text-terracotta-300" : "text-chalk",
+        },
+        { label: t.dash.statDue, value: dueSoon.length, tone: dueSoon.length ? "text-ochre-300" : "text-chalk" },
+        { label: t.dash.statCourses, value: cards.length, tone: "text-chalk" },
+      ]
+    : [
+        { label: t.dash.statCourses, value: cards.length, tone: "text-chalk" },
+        { label: t.dash.statStudents, value: studentCount, tone: "text-chalk" },
+        { label: t.dash.statToGrade, value: totalToGrade, tone: totalToGrade ? "text-ochre-300" : "text-chalk" },
+        { label: t.calendar.timetable, value: todays.length, tone: "text-chalk", suffix: t.shell.today.toLowerCase() },
+      ];
+
   function dueLabel(iso: string) {
     const d = daysUntil(iso, now);
     if (d < 0) return { text: t.dash.overdue, cls: "bg-terracotta-50 text-terracotta-600" };
@@ -140,36 +164,33 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[15px] font-semibold capitalize text-slate-500">
-            {formatDayLabel(locale, today, { weekday: "long", day: "numeric", month: "long" })}
-          </p>
-          <h1 className="mt-1 font-display text-[2.4rem] font-semibold leading-tight">
-            {greeting}
-            {firstName ? `, ${firstName}` : ""}
-          </h1>
+      <section className="relative mb-8 overflow-hidden rounded-[24px] bg-ardoise text-chalk">
+        <div aria-hidden className="absolute inset-0 opacity-80" style={{ backgroundImage: NDOP_CHALK }} />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-ardoise via-ardoise/90 to-ardoise/40" />
+        <div className="relative grid gap-7 px-6 py-7 md:px-8 md:py-9 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <p className="text-[14.5px] font-semibold text-chalk/60 first-letter:uppercase">
+              {formatDayLabel(locale, today, { weekday: "long", day: "numeric", month: "long" })}
+            </p>
+            <h1 className="mt-1 font-display text-[2.3rem] font-semibold leading-tight md:text-[2.8rem]">
+              {greeting}
+              {firstName ? `, ${firstName}` : ""}
+            </h1>
+            <p className="mt-1 text-[16px] text-chalk/70">{t.dash.subtitle}</p>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-10 gap-y-5 sm:grid-cols-4">
+            {stats.map((s) => (
+              <div key={s.label}>
+                <dt className="text-[13px] font-semibold text-chalk/60">{s.label}</dt>
+                <dd className={`num mt-0.5 font-display text-[2rem] font-semibold leading-none ${s.tone}`}>
+                  {s.value}
+                  {s.suffix ? <span className="ml-1 text-[15px] text-chalk/50">{s.suffix}</span> : null}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
-      </div>
-
-      {/* Numbers that matter for this person */}
-      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {isStudent ? (
-          <>
-            <Stat label={t.dash.statAverage} value={overall === null ? "—" : formatScore(locale, Math.round(overall * 100) / 100)} hint="/20" tone={overall !== null && overall < 10 ? "terracotta" : "ink"} />
-            <Stat label={t.dash.statAttendance} value={attendanceRate === null ? "—" : `${Math.round(attendanceRate * 100)} %`} tone={attendanceRate !== null && attendanceRate < 0.75 ? "terracotta" : "leaf"} />
-            <Stat label={t.dash.statDue} value={dueSoon.length} tone={dueSoon.length ? "ochre" : "ink"} />
-            <Stat label={t.dash.statCourses} value={cards.length} />
-          </>
-        ) : (
-          <>
-            <Stat label={t.dash.statCourses} value={cards.length} />
-            <Stat label={t.dash.statStudents} value={studentCount} />
-            <Stat label={t.dash.statToGrade} value={totalToGrade} tone={totalToGrade ? "ochre" : "ink"} />
-            <Stat label={t.dash.todayTitle} value={todays.length} hint={t.calendar.timetable} />
-          </>
-        )}
-      </div>
+      </section>
 
       <div className="grid gap-8 xl:grid-cols-[1fr_360px]">
         <section>

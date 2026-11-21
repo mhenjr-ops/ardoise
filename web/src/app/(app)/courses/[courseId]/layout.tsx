@@ -16,7 +16,7 @@ import {
 import { getCourseContext } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
 import { NDOP_COVER } from "@/lib/ndop";
-import { NavLink } from "@/components/nav-link";
+import { CourseNav } from "@/components/course/course-nav";
 import { Badge } from "@/components/ui";
 
 export default async function CourseLayout({ children, params }: LayoutProps<"/courses/[courseId]">) {
@@ -73,16 +73,7 @@ export default async function CourseLayout({ children, params }: LayoutProps<"/c
       </div>
 
       <div className="md:flex md:gap-8">
-        <nav
-          aria-label={course.title}
-          className="-mx-4 mb-6 flex gap-1 overflow-x-auto px-4 pb-1 md:sticky md:top-24 md:mx-0 md:mb-0 md:w-52 md:shrink-0 md:flex-col md:self-start md:overflow-visible md:px-0"
-        >
-          {nav.map((n) => (
-            <NavLink key={n.href} href={n.href} exact={n.exact} icon={n.icon}>
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
+        <CourseNav items={nav} label={course.title} />
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     </div>

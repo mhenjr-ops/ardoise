@@ -24,10 +24,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("read_at", null),
     supabase.rpc("inbox_unread_count"),
   ]);
-  const courses = ((enrolled ?? []) as CourseRow[])
+  let courses = ((enrolled ?? []) as CourseRow[])
     .map((r) => (Array.isArray(r.course) ? r.course[0] : r.course))
     .filter((c): c is NavCourse => !!c)
     .sort((a, b) => a.code.localeCompare(b.code));
+  if (!courses.length && isAdminOrRegistrar && institution) {
+    const { data: all } = await supabase.from("courses").select("id, code, title, color").eq("institution_id", institution.id).order("code").limit(12);
+    courses = (all ?? []) as NavCourse[];
+  }
   const inboxBadge = typeof unreadInbox === "number" ? unreadInbox : 0;
 
   const items: NavItem[] = [

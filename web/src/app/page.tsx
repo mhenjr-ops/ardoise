@@ -96,7 +96,7 @@ export default async function Landing() {
       </header>
 
       {/* Hero: the slate */}
-      <section className="relative overflow-hidden bg-ardoise pb-20 pt-32 text-chalk md:pb-28 md:pt-40">
+      <section className="relative overflow-hidden bg-ardoise pb-24 pt-32 text-chalk md:pb-36 md:pt-40">
         <div aria-hidden className="absolute inset-0 opacity-50" style={{ backgroundImage: NDOP_CHALK }} />
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_30%,transparent_0%,var(--color-ardoise)_70%)]" />
         <div className="relative mx-auto grid max-w-[1200px] items-center gap-14 px-5 md:px-8 lg:grid-cols-[1.05fr_1fr]">
@@ -160,7 +160,7 @@ export default async function Landing() {
               </div>
             </div>
             {/* Phone with the attendance code */}
-            <div className="absolute -bottom-12 -left-6 hidden w-[200px] rotate-[-4deg] rounded-[28px] border-[6px] border-ardoise-deep bg-paper p-4 text-center shadow-float sm:block">
+            <div className="absolute -bottom-28 -left-10 hidden w-[200px] rotate-[-4deg] rounded-[28px] border-[6px] border-ardoise-deep bg-paper p-4 text-center shadow-float sm:block">
               <p className="text-[12px] font-semibold text-slate-500">{t.attendance.checkInTitle}</p>
               <p className="num mt-2 font-display text-[2rem] font-semibold tracking-[0.12em] text-ardoise">482 913</p>
               <span className="mt-3 block rounded-lg bg-ardoise py-2 text-[13px] font-bold text-chalk">{t.attendance.checkIn}</span>
@@ -191,7 +191,7 @@ export default async function Landing() {
 
       {/* The real sequence: mark → transcript */}
       <section className="relative overflow-hidden border-y border-slate-200 bg-paper">
-        <div aria-hidden className="absolute inset-0" style={{ backgroundImage: NDOP_INK }} />
+        <div aria-hidden className="absolute inset-0 opacity-50" style={{ backgroundImage: NDOP_INK }} />
         <div className="relative mx-auto max-w-[1200px] px-5 py-20 md:px-8 md:py-24">
           <h2 className="max-w-xl font-display text-[2.3rem] font-semibold leading-tight">{L.flowTitle}</h2>
           <ol className="mt-12 grid gap-6 md:grid-cols-4">

@@ -53,6 +53,10 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     .map((r) => ({ role: r.role, course: Array.isArray(r.course) ? r.course[0] : r.course }))
     .filter((r): r is { role: CourseRole; course: CourseLite } => !!r.course);
   const courseById = new Map(mine.map((r) => [r.course.id, r.course]));
+  if (isAdminOrRegistrar) {
+    const { data: all } = await supabase.from("courses").select("id, code, title, color");
+    for (const c of (all ?? []) as CourseLite[]) if (!courseById.has(c.id)) courseById.set(c.id, c);
+  }
   const staffCourses = mine.filter((r) => r.role !== "student").map((r) => r.course);
   const staffIds = new Set(staffCourses.map((c) => c.id));
 
@@ -79,6 +83,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   for (const o of occurrences) byDay.get(o.day)?.events.push(o);
   for (const d of dueList) byDay.get(watDayKey(d.due_at))?.dues.push(d);
 
+  const colorOf = (ev: CalendarEvent) => (ev.course_id && ev.kind !== "office_hours" ? courseById.get(ev.course_id)?.color : null) ?? EVENT_COLORS[ev.kind];
   const canEdit = (ev: CalendarEvent) => (ev.course_id ? staffIds.has(ev.course_id) : isAdminOrRegistrar);
   const prev = view === "month" ? `${addDays(`${anchor.slice(0, 7)}-01`, -1).slice(0, 7)}-01` : addDays(anchor, -7);
   const next = view === "month" ? `${addDays(`${anchor.slice(0, 7)}-01`, 32).slice(0, 7)}-01` : addDays(anchor, 7);
@@ -95,7 +100,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     <span
       key={`${o.id}-${o.occurrence_start}`}
       className="flex items-center gap-1.5 truncate rounded-md px-1.5 py-0.5 text-[12px] font-semibold text-white"
-      style={{ backgroundColor: EVENT_COLORS[o.kind] }}
+      style={{ backgroundColor: colorOf(o) }}
       title={`${formatTime(locale, o.occurrence_start)} ${o.title}`}
     >
       <span className="num opacity-80">{formatTime(locale, o.occurrence_start)}</span>
@@ -135,7 +140,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
             <Link href={href(next)} aria-label={t.calendar.next} className="grid h-9 w-9 place-items-center rounded-full hover:bg-slate-100">
               <ChevronRight size={18} aria-hidden />
             </Link>
-            <h2 className="font-display text-xl font-semibold capitalize">{title}</h2>
+            <h2 className="font-display text-xl font-semibold first-letter:uppercase">{title}</h2>
             <Link href={href(today)} className="ml-auto rounded-full border border-slate-300 px-3 py-1 text-[13.5px] font-semibold hover:bg-slate-50">
               {t.calendar.today}
             </Link>
@@ -232,7 +237,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
                           <div
                             key={`${o.id}-${o.occurrence_start}`}
                             className="absolute inset-x-1 overflow-hidden rounded-lg px-2 py-1 text-white shadow-sm"
-                            style={{ top, height, backgroundColor: EVENT_COLORS[o.kind] }}
+                            style={{ top, height, backgroundColor: colorOf(o) }}
                             title={o.title}
                           >
                             <p className="truncate text-[12.5px] font-bold leading-tight">{o.title}</p>
@@ -334,7 +339,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
                       <ul className="space-y-2">
                         {cell.events.map((o) => (
                           <li key={`${o.id}-${o.occurrence_start}`} className="flex gap-3">
-                            <span className="mt-1 w-1 shrink-0 self-stretch rounded-full" style={{ backgroundColor: EVENT_COLORS[o.kind] }} />
+                            <span className="mt-1 w-1 shrink-0 self-stretch rounded-full" style={{ backgroundColor: colorOf(o) }} />
                             <div className="min-w-0 flex-1">
                               <p className="text-[14.5px] font-semibold leading-snug">{o.title}</p>
                               <p className="num flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-slate-500">
