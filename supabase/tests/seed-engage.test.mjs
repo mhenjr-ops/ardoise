@@ -42,6 +42,15 @@ check('sessions are in the past', (await n(`select count(*) n from public.attend
 check('three TP 3 hand-ins wait for grading', (await n(`select count(*) n from public.submissions s where not exists (
   select 1 from public.grades g where g.assignment_id = s.assignment_id and g.student_id = s.student_id and g.score is not null)`)) === 3);
 check('hand-in times are spread out', (await n('select count(distinct submitted_at) n from public.submissions')) === (await n('select count(*) n from public.submissions')));
+await db.exec(readFileSync(new URL('../seed/demo-roles.sql', import.meta.url), 'utf8'));
+check('the demo admin is the owner, with a registrar and a head of department',
+  (await n(`select count(*) n from public.memberships where role in ('owner', 'registrar', 'hod')`)) === 3);
+check('the student list has 8 matricules, 5 already linked',
+  (await n('select count(*) n from public.student_roster')) === 8 && (await n('select count(*) n from public.student_roster where claimed_by is not null')) === 5);
+check('every demo course belongs to the Computer Science department',
+  (await n('select count(*) n from public.courses where department_id is null')) === 0);
+await db.exec(readFileSync(new URL('../seed/demo-roles.sql', import.meta.url), 'utf8'));
+check('demo-roles.sql is safe to run twice', (await n('select count(*) n from public.student_roster')) === 8);
 check('notifications created (triggers + seeded)', (await n('select count(*) n from public.notifications')) > 20);
 check('syllabus written', (await n(`select count(*) n from public.courses where syllabus <> ''`)) === 2);
 await db.exec(engage);

@@ -12,19 +12,6 @@ function rpcErrorCode(message: string) {
   return "generic";
 }
 
-export async function addMember(formData: FormData) {
-  const institutionId = String(formData.get("institution_id") ?? "");
-  const email = String(formData.get("email") ?? "").trim();
-  const role = String(formData.get("role") ?? "student");
-  if (!email) redirect("/admin?error=invalid");
-
-  const { supabase } = await actionSession();
-  const { error } = await supabase.rpc("add_member_by_email", { p_institution: institutionId, p_email: email, p_role: role });
-  if (error) redirect(`/admin?error=${rpcErrorCode(error.message)}`);
-  revalidatePath("/admin");
-  redirect("/admin?ok=1");
-}
-
 export async function createCourse(formData: FormData) {
   const institutionId = String(formData.get("institution_id") ?? "");
   const code = String(formData.get("code") ?? "").trim().toUpperCase();
@@ -32,6 +19,7 @@ export async function createCourse(formData: FormData) {
   const level = String(formData.get("level") ?? "").trim() || null;
   const language = formData.get("language") === "fr" ? "fr" : "en";
   const teacherEmail = String(formData.get("teacher_email") ?? "").trim();
+  const departmentId = String(formData.get("department_id") ?? "") || null;
   if (!code || !title) redirect("/admin?error=invalid");
 
   const { supabase } = await actionSession();
@@ -43,7 +31,7 @@ export async function createCourse(formData: FormData) {
 
   const { data, error } = await supabase
     .from("courses")
-    .insert({ institution_id: institutionId, code, title, level, language, color })
+    .insert({ institution_id: institutionId, code, title, level, language, color, department_id: departmentId })
     .select("id")
     .single();
   if (error || !data) redirect("/admin?error=forbidden");

@@ -19,7 +19,7 @@ const badgeTone = { present: "success", late: "warn", absent: "danger", excused:
 export default async function AttendancePage({ params, searchParams }: PageProps<"/courses/[courseId]/attendance">) {
   const { courseId } = await params;
   const sp = await searchParams;
-  const [{ supabase, course, isStaff, user }, { t, locale }] = await Promise.all([getCourseContext(courseId), getI18n()]);
+  const [{ supabase, course, isStaff, canSeeStaffViews, user }, { t, locale }] = await Promise.all([getCourseContext(courseId), getI18n()]);
   const back = `/courses/${course.id}/attendance`;
 
   const [{ data: sessionRows }, { data: recordRows }] = await Promise.all([
@@ -30,7 +30,7 @@ export default async function AttendancePage({ params, searchParams }: PageProps
   const records = (recordRows ?? []) as AttendanceRecord[];
   const attended = (rs: AttendanceRecord[]) => (rs.length ? rs.filter((r) => r.status !== "absent").length / rs.length : null);
 
-  if (!isStaff) {
+  if (!canSeeStaffViews) {
     const mine = records.filter((r) => r.student_id === user.id);
     const rate = attended(mine);
     return (
@@ -85,6 +85,7 @@ export default async function AttendancePage({ params, searchParams }: PageProps
         <Stat label={t.analytics.students} value={students.length} />
       </div>
 
+      {isStaff ? (
       <Disclosure summary={t.attendance.newSession} open={sessions.length === 0}>
         <form action={createSession} className="grid gap-3 sm:grid-cols-[1fr_220px_auto] sm:items-end">
           <input type="hidden" name="course_id" value={course.id} />
@@ -97,6 +98,7 @@ export default async function AttendancePage({ params, searchParams }: PageProps
           <Button type="submit">{t.common.create}</Button>
         </form>
       </Disclosure>
+      ) : null}
 
       {sessions.length === 0 ? (
         <Empty>{t.attendance.noSessions}</Empty>

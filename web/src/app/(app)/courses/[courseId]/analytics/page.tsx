@@ -20,8 +20,8 @@ const BUCKETS = [
 
 export default async function AnalyticsPage({ params }: PageProps<"/courses/[courseId]/analytics">) {
   const { courseId } = await params;
-  const [{ supabase, course, isStaff }, { t, locale }] = await Promise.all([getCourseContext(courseId), getI18n()]);
-  if (!isStaff) redirect(`/courses/${courseId}`);
+  const [{ supabase, course, canSeeStaffViews }, { t, locale }] = await Promise.all([getCourseContext(courseId), getI18n()]);
+  if (!canSeeStaffViews) redirect(`/courses/${courseId}`);
   const now = nowMs();
 
   const [{ data: studentRows }, { data: asg }, { data: grades }, { data: subs }, { data: attempts }, { data: att }] = await Promise.all([

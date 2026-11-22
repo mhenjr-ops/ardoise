@@ -18,8 +18,11 @@ export async function GET(_request: Request, { params }: RouteContext<"/courses/
   } = await supabase.auth.getUser();
   if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
-  const { data: isStaff } = await supabase.rpc("is_course_staff", { course: courseId });
-  if (isStaff !== true) return new NextResponse("Forbidden", { status: 403 });
+  const [{ data: isStaff }, { data: oversees }] = await Promise.all([
+    supabase.rpc("is_course_staff", { course: courseId }),
+    supabase.rpc("can_oversee_course", { course: courseId }),
+  ]);
+  if (isStaff !== true && oversees !== true) return new NextResponse("Forbidden", { status: 403 });
 
   const [{ data: course }, { data: aData }, { data: gData }, { data: sData }] = await Promise.all([
     supabase.from("courses").select("code").eq("id", courseId).single(),

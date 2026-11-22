@@ -11,6 +11,9 @@ import { notificationText, timeAgo } from "@/lib/notifications";
 import { Card, CardHeader, Empty } from "@/components/ui";
 import { NDOP_CHALK } from "@/lib/ndop";
 import { CourseCard } from "@/components/course/course-card";
+import { SetupChecklist } from "@/components/home/setup-checklist";
+import { OfficePanel } from "@/components/home/office-panel";
+import { DepartmentPanel } from "@/components/home/department-panel";
 import type { AppNotification, CalendarEvent, Course, CourseRole } from "@/lib/types";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -22,7 +25,7 @@ type EnrollmentRow = { role: CourseRole; course: Course | Course[] | null };
 type Item = { id: string; course_id: string; title: string; due_at: string | null; points_possible: number; weight: number; published: boolean };
 
 export default async function DashboardPage() {
-  const [{ supabase, user, institution, isAdminOrRegistrar, profile }, { t, locale }] = await Promise.all([
+  const [{ supabase, user, institution, can, roles, memberships, profile }, { t, locale }] = await Promise.all([
     requireInstitution(),
     getI18n(),
   ]);
@@ -34,20 +37,11 @@ export default async function DashboardPage() {
     .select("role, course:courses(id, institution_id, code, title, description, language, level, color, published)")
     .eq("user_id", user.id);
 
-  const byId = new Map<string, { course: Course; role: CourseRole | "admin" }>();
+  // "My courses" are the ones I teach or take; the office and departments get their own panels.
+  const byId = new Map<string, { course: Course; role: CourseRole }>();
   for (const row of (enrollmentRows ?? []) as EnrollmentRow[]) {
     const course = Array.isArray(row.course) ? row.course[0] : row.course;
     if (course) byId.set(course.id, { course, role: row.role });
-  }
-  if (isAdminOrRegistrar) {
-    const { data: allCourses } = await supabase
-      .from("courses")
-      .select("id, institution_id, code, title, description, language, level, color, published")
-      .eq("institution_id", institution.id)
-      .order("code");
-    for (const course of (allCourses ?? []) as Course[]) {
-      if (!byId.has(course.id)) byId.set(course.id, { course, role: "admin" });
-    }
   }
   const cards = [...byId.values()].sort((a, b) => a.course.code.localeCompare(b.course.code));
   const courseIds = cards.map((c) => c.course.id);
@@ -126,12 +120,42 @@ export default async function DashboardPage() {
   }
   const totalToGrade = [...toGrade.values()].reduce((s, n) => s + n, 0);
 
+  // School-wide figures for the office (owner, admin, registrar) when they don't teach.
+  const office = can.manageStudents && staffIds.length === 0 && studentIds.length === 0;
+  let officeStats: { linked: number; total: number; staff: number; courses: number; claims: number } | null = null;
+  if (office) {
+    const head = { count: "exact" as const, head: true };
+    const [total, linked, staff, courseCount, claims] = await Promise.all([
+      supabase.from("student_roster").select("id", head).eq("institution_id", institution.id),
+      supabase.from("student_roster").select("id", head).eq("institution_id", institution.id).not("claimed_by", "is", null),
+      supabase.from("memberships").select("id", head).eq("institution_id", institution.id).neq("role", "student"),
+      supabase.from("courses").select("id", head).eq("institution_id", institution.id),
+      supabase.from("matricule_claims").select("id", head).eq("institution_id", institution.id).in("status", ["waiting", "disputed"]),
+    ]);
+    officeStats = {
+      linked: linked.count ?? 0,
+      total: total.count ?? 0,
+      staff: staff.count ?? 0,
+      courses: courseCount.count ?? 0,
+      claims: claims.count ?? 0,
+    };
+  }
+
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: "Africa/Douala" }).format(now));
   const greeting = hour < 17 ? t.shell.goodMorning : t.shell.goodEvening;
   const firstName = (profile.full_name || "").replace(/^(Dr|Pr|M\.|Mme)\s+/i, "").split(" ")[0];
   const isStudent = studentIds.length > 0 && staffIds.length === 0;
 
-  const stats: Array<{ label: string; value: string | number; tone: string; suffix?: string }> = isStudent
+  const stats: Array<{ label: string; value: string | number; tone: string; suffix?: string }> = officeStats
+    ? [
+        { label: t.home.students, value: officeStats.linked, suffix: `/ ${officeStats.total}`, tone: "text-chalk" },
+        { label: t.home.staff, value: officeStats.staff, tone: "text-chalk" },
+        { label: t.home.courses, value: officeStats.courses, tone: "text-chalk" },
+        { label: t.home.toCheck, value: officeStats.claims, tone: officeStats.claims ? "text-ochre-300" : "text-chalk" },
+      ]
+    : !staffIds.length && !studentIds.length
+      ? []
+      : isStudent
     ? [
         {
           label: t.dash.statAverage,
@@ -153,6 +177,7 @@ export default async function DashboardPage() {
         { label: t.dash.statToGrade, value: totalToGrade, tone: totalToGrade ? "text-ochre-300" : "text-chalk" },
         { label: t.calendar.timetable, value: todays.length, tone: "text-chalk", suffix: t.shell.today.toLowerCase() },
       ];
+  const topRole = (["owner", "admin", "registrar", "dean", "hod", "teacher", "student"] as const).find((r) => roles.includes(r));
 
   function dueLabel(iso: string) {
     const d = daysUntil(iso, now);
@@ -176,7 +201,9 @@ export default async function DashboardPage() {
               {greeting}
               {firstName ? `, ${firstName}` : ""}
             </h1>
-            <p className="mt-1 text-[16px] text-chalk/70">{t.dash.subtitle}</p>
+            <p className="mt-1 text-[16px] text-chalk/70">
+              {topRole && topRole !== "student" && topRole !== "teacher" ? `${t.roles[topRole]} · ${institution.name}` : t.dash.subtitle}
+            </p>
           </div>
           <dl className="grid grid-cols-2 gap-x-10 gap-y-5 sm:grid-cols-4">
             {stats.map((s) => (
@@ -192,11 +219,17 @@ export default async function DashboardPage() {
         </div>
       </section>
 
+      {can.manageSchool ? <SetupChecklist supabase={supabase} institution={institution} t={t} /> : null}
+      {can.manageStudents ? <OfficePanel supabase={supabase} institutionId={institution.id} t={t} /> : null}
+      {can.oversees ? (
+        <DepartmentPanel supabase={supabase} institutionId={institution.id} memberships={memberships} t={t} locale={locale} />
+      ) : null}
+
       <div className="grid gap-8 xl:grid-cols-[1fr_360px]">
         <section>
-          <h2 className="mb-4 font-display text-2xl font-semibold">{t.dash.coursesTitle}</h2>
+          {cards.length || !can.isStaff ? <h2 className="mb-4 font-display text-2xl font-semibold">{t.dash.coursesTitle}</h2> : null}
           {cards.length === 0 ? (
-            <Empty>{t.dashboard.noCourses}</Empty>
+            can.isStaff ? null : <Empty>{t.dashboard.noCourses}</Empty>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {cards.map(({ course, role }) => {
@@ -211,7 +244,7 @@ export default async function DashboardPage() {
                     title={course.title}
                     color={course.color}
                     level={course.level}
-                    roleLabel={role === "student" ? t.dashboard.student : role === "admin" ? t.admin.roles.admin : t.dashboard.teaching}
+                    roleLabel={role === "student" ? t.dashboard.student : t.dashboard.teaching}
                     progress={progress}
                     progressLabel={t.dash.done}
                     footer={

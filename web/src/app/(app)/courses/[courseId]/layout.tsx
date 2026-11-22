@@ -18,10 +18,15 @@ import { getI18n } from "@/lib/i18n/server";
 import { NDOP_COVER } from "@/lib/ndop";
 import { CourseNav } from "@/components/course/course-nav";
 import { Badge } from "@/components/ui";
+import { Eye } from "lucide-react";
+import { fmt } from "@/lib/i18n/messages-engage";
 
 export default async function CourseLayout({ children, params }: LayoutProps<"/courses/[courseId]">) {
   const { courseId } = await params;
-  const [{ course, isStaff, supabase }, { t }] = await Promise.all([getCourseContext(courseId), getI18n()]);
+  const [{ course, isStaff, canSeeStaffViews, isOverseer, overseerRole, supabase }, { t }] = await Promise.all([
+    getCourseContext(courseId),
+    getI18n(),
+  ]);
   const base = `/courses/${course.id}`;
   const { data: teachers } = await supabase
     .from("enrollments")
@@ -45,9 +50,9 @@ export default async function CourseLayout({ children, params }: LayoutProps<"/c
     { href: `${base}/grades`, label: t.course.grades, icon: <ClipboardList size={17} /> },
     { href: `${base}/files`, label: t.files.title, icon: <FolderOpen size={17} /> },
     { href: `${base}/attendance`, label: t.attendance.title, icon: <CalendarCheck2 size={17} /> },
-    ...(isStaff
+    ...(isStaff ? [{ href: `${base}/rubrics`, label: t.rubrics.title, icon: <ListChecks size={17} /> }] : []),
+    ...(canSeeStaffViews
       ? [
-          { href: `${base}/rubrics`, label: t.rubrics.title, icon: <ListChecks size={17} /> },
           { href: `${base}/people`, label: t.course.people, icon: <Users size={17} /> },
           { href: `${base}/analytics`, label: t.analytics.title, icon: <BarChart3 size={17} /> },
         ]
@@ -71,6 +76,13 @@ export default async function CourseLayout({ children, params }: LayoutProps<"/c
           ) : null}
         </div>
       </div>
+
+      {isOverseer && overseerRole ? (
+        <p className="mb-5 flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2.5 text-[14.5px] font-semibold text-indigo-700 ring-1 ring-indigo-100">
+          <Eye size={17} aria-hidden />
+          {fmt(t.oversee.banner, { role: t.roles[overseerRole].toLowerCase() })}
+        </p>
+      ) : null}
 
       <div className="md:flex md:gap-8">
         <CourseNav items={nav} label={course.title} />

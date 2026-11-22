@@ -8,6 +8,8 @@ export const DEMO_ENABLED = process.env.DEMO_LOGINS === "on";
 
 export const DEMO_ACCOUNTS = {
   admin: "admin@demo.ardoise.cm",
+  registrar: "scolarite@demo.ardoise.cm",
+  hod: "hod.info@demo.ardoise.cm",
   teacher: "j.mbarga@demo.ardoise.cm",
   student: "brenda@demo.ardoise.cm",
 } as const;

@@ -52,6 +52,14 @@ async function as(user, sql, params = []) {
     await db.exec('reset role');
   }
 }
+async function createSchool(user, name, slug) {
+  await db.query('insert into public.platform_admins (user_id) values ($1) on conflict do nothing', [ids[user]]);
+  try {
+    return (await as(user, 'select public.create_institution($1, $2) as id', [name, slug])).rows[0].id;
+  } finally {
+    await db.query('delete from public.platform_admins where user_id = $1', [ids[user]]);
+  }
+}
 let failures = 0;
 function check(label, cond) {
   console.log(`${cond ? 'PASS' : 'FAIL'}  ${label}`);
@@ -70,15 +78,17 @@ try {
 const profiles = await db.query('select count(*)::int n from public.profiles');
 check('profiles auto-created', profiles.rows[0].n === 5);
 
-const inst = (await as('A', `select public.create_institution('Institut Démo', 'demo') as id`)).rows[0].id;
+const inst = await createSchool('A', 'Institut Démo', 'demo');
 check('A creates institution', !!inst);
 await as('A', `select public.add_member_by_email($1, 't@demo.cm', 'teacher')`, [inst]);
 await as('A', `select public.add_member_by_email($1, 's1@demo.cm', 'student')`, [inst]);
 await expectError('teacher cannot add members', () => as('T', `select public.add_member_by_email($1, 's2@demo.cm', 'student')`, [inst]));
 
-const course = (await as('T', `insert into public.courses (institution_id, code, title) values ($1, 'INF101', 'Algorithmique') returning id`, [inst])).rows[0].id;
+await expectError('a teacher cannot create a course', () => as('T', `insert into public.courses (institution_id, code, title) values ($1, 'NOPE', 'x')`, [inst]));
+const course = (await as('A', `insert into public.courses (institution_id, code, title) values ($1, 'INF101', 'Algorithmique') returning id`, [inst])).rows[0].id;
+await as('A', `select public.enroll_by_email($1, 't@demo.cm', 'teacher')`, [course]);
 const tEnroll = await as('T', `select role from public.enrollments where course_id = $1 and user_id = $2`, [course, ids.T]);
-check('teacher auto-enrolled as teacher', tEnroll.rows[0]?.role === 'teacher');
+check('the school assigns the teacher to the course', tEnroll.rows[0]?.role === 'teacher');
 
 await as('T', `select public.enroll_by_email($1, 's1@demo.cm', 'student')`, [course]);
 const mod = (await as('T', `insert into public.modules (course_id, title, position) values ($1, 'Semaine 1', 1) returning id, institution_id`, [course])).rows[0];
@@ -124,7 +134,7 @@ const s1Audit = await as('S1', `select id from public.mark_audit_log`);
 check('S1 cannot read audit log', s1Audit.rows.length === 0);
 
 // Cross-tenant isolation
-const instX = (await as('X', `select public.create_institution('Other School', 'other') as id`)).rows[0].id;
+const instX = await createSchool('X', 'Other School', 'other');
 check('X creates own institution', !!instX);
 const xCourses = await as('X', `select id from public.courses`);
 check('X sees 0 courses of demo', xCourses.rows.length === 0);
@@ -136,7 +146,8 @@ const xInst = await as('X', `select id from public.institutions`);
 check('X sees only own institution', xInst.rows.length === 1 && xInst.rows[0].id === instX);
 
 // Module item cannot point at another course's page
-const course2 = (await as('T', `insert into public.courses (institution_id, code, title) values ($1, 'MAT102', 'Analyse') returning id`, [inst])).rows[0].id;
+const course2 = (await as('A', `insert into public.courses (institution_id, code, title) values ($1, 'MAT102', 'Analyse') returning id`, [inst])).rows[0].id;
+await as('A', `select public.enroll_by_email($1, 't@demo.cm', 'teacher')`, [course2]);
 const mod2 = (await as('T', `insert into public.modules (course_id, title) values ($1, 'M') returning id`, [course2])).rows[0].id;
 await expectError('item cannot link page from another course', () => as('T', `insert into public.module_items (module_id, item_type, title, page_id) values ($1, 'page', 'x', $2)`, [mod2, page]));
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, GraduationCap, Inbox, LayoutDashboard, LogOut, Settings2 } from "lucide-react";
+import { CalendarDays, GraduationCap, Inbox, LayoutDashboard, LogOut, Settings2, ShieldCheck } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
 import { NDOP_CHALK } from "@/lib/ndop";
@@ -14,7 +14,7 @@ import { SidebarNav, TabBar, type NavCourse, type NavItem } from "@/components/s
 type CourseRow = { course: NavCourse | NavCourse[] | null };
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  const [{ supabase, user, profile, institution, isAdminOrRegistrar, roles }, { t, locale }] = await Promise.all([
+  const [{ supabase, user, profile, institution, can, roles, isPlatformAdmin }, { t, locale }] = await Promise.all([
     getSession(),
     getI18n(),
   ]);
@@ -28,7 +28,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     .map((r) => (Array.isArray(r.course) ? r.course[0] : r.course))
     .filter((c): c is NavCourse => !!c)
     .sort((a, b) => a.code.localeCompare(b.code));
-  if (!courses.length && isAdminOrRegistrar && institution) {
+  if (!courses.length && (can.manageStudents || can.oversees) && institution) {
+    // Row-level security returns only the courses this person oversees.
     const { data: all } = await supabase.from("courses").select("id, code, title, color").eq("institution_id", institution.id).order("code").limit(12);
     courses = (all ?? []) as NavCourse[];
   }
@@ -38,13 +39,19 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     { href: "/dashboard", label: t.nav.dashboard, icon: <LayoutDashboard size={19} aria-hidden /> },
     { href: "/calendar", label: t.shell.calendar, icon: <CalendarDays size={19} aria-hidden /> },
     { href: "/inbox", label: t.shell.inbox, icon: <Inbox size={19} aria-hidden />, badge: inboxBadge },
-    { href: "/results", label: t.nav.results, icon: <GraduationCap size={19} aria-hidden /> },
   ];
-  if (isAdminOrRegistrar) {
+  if (roles.includes("student")) {
+    items.push({ href: "/results", label: t.nav.results, icon: <GraduationCap size={19} aria-hidden /> });
+  }
+  if (can.adminArea) {
     items.push({ href: "/admin", label: t.nav.admin, icon: <Settings2 size={19} aria-hidden /> });
   }
+  if (isPlatformAdmin) {
+    items.push({ href: "/platform", label: t.nav2.platform, icon: <ShieldCheck size={19} aria-hidden /> });
+  }
   const displayName = profile.full_name || profile.email;
-  const roleLabel = roles[0] ? t.admin.roles[roles[0]] : "";
+  const topRole = (["owner", "admin", "registrar", "dean", "hod", "teacher", "student"] as const).find((r) => roles.includes(r));
+  const roleLabel = topRole ? t.roles[topRole] : isPlatformAdmin ? t.nav2.platform : "";
   const paletteLabels = {
     search: t.shell.search,
     placeholder: t.shell.searchPlaceholder,

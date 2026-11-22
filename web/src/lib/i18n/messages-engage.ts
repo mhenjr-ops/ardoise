@@ -69,7 +69,9 @@ export const frEngage = {
   demo: {
     title: "Explorer la démo",
     body: "Entrez dans l'Institut Supérieur Démo de Yaoundé avec un rôle :",
-    admin: "Scolarité",
+    admin: "Direction",
+    registrar: "Scolarité",
+    hod: "Chef de dépt",
     teacher: "Enseignant",
     student: "Étudiante",
   },
@@ -343,7 +345,9 @@ export const enEngage: EngageMessages = {
   demo: {
     title: "Explore the demo",
     body: "Enter the Institut Supérieur Démo de Yaoundé as:",
-    admin: "Registrar",
+    admin: "Owner",
+    registrar: "Registrar",
+    hod: "Head of dept",
     teacher: "Teacher",
     student: "Student",
   },

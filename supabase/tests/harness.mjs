@@ -69,9 +69,18 @@ export async function setup(userKeys) {
       check(`${label} -> ${msg}`, match ? msg.includes(match) : true);
     }
   }
+  // Schools are created by platform admins; tests borrow that role for a moment.
+  async function createSchool(user, name, slug) {
+    await db.query('insert into public.platform_admins (user_id) values ($1) on conflict do nothing', [ids[user]]);
+    try {
+      return (await as(user, 'select public.create_institution($1, $2) as id', [name, slug])).rows[0].id;
+    } finally {
+      await db.query('delete from public.platform_admins where user_id = $1', [ids[user]]);
+    }
+  }
   function done() {
     console.log(failures === 0 ? '\nALL CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);
     process.exit(failures ? 1 : 0);
   }
-  return { db, ids, as, check, expectError, done, fail: () => failures++ };
+  return { db, ids, as, check, expectError, done, createSchool, fail: () => failures++ };
 }

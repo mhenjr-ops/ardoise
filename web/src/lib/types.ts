@@ -1,4 +1,5 @@
-export type InstitutionRole = "admin" | "registrar" | "teacher" | "student";
+export type InstitutionRole = "owner" | "admin" | "registrar" | "dean" | "hod" | "teacher" | "student";
+export const STAFF_ROLES = ["owner", "admin", "registrar", "dean", "hod", "teacher"] as const;
 export type CourseRole = "teacher" | "ta" | "student";
 export type Component = "cc" | "tp" | "exam" | "resit" | "other";
 
@@ -13,6 +14,7 @@ export type Institution = {
 export type Course = {
   id: string;
   institution_id: string;
+  department_id?: string | null;
   code: string;
   title: string;
   description: string;

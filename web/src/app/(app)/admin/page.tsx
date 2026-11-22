@@ -1,56 +1,53 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { ClipboardList, Users } from "lucide-react";
 import { requireInstitution } from "@/lib/session";
 import { errorText, getI18n } from "@/lib/i18n/server";
-import { Avatar, Badge, Button, Card, CardHeader, Field, Flash, Input, Select, Stat, cx } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Field, Flash, Input, Select, Stat, cx } from "@/components/ui";
+import { fmt } from "@/lib/i18n/messages-engage";
 import { fetchAll } from "@/lib/fetch-all";
 import { weightedAverage } from "@/lib/grades";
 import { formatScore } from "@/lib/format";
 import type { Course, InstitutionRole } from "@/lib/types";
-import { addMember, createCourse } from "./actions";
+import { createCourse } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
   return { title: t.admin.title };
 }
 
-type MemberRow = {
-  user_id: string;
-  role: InstitutionRole;
-  profile: { full_name: string; email: string } | { full_name: string; email: string }[] | null;
-};
+type MemberRow = { user_id: string; role: InstitutionRole };
 
 export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
-  const [{ supabase, institution, isAdminOrRegistrar, isAdmin }, { t, locale }] = await Promise.all([
-    requireInstitution(),
-    getI18n(),
-  ]);
+  const [{ supabase, institution, can }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
   const { error, ok } = await searchParams;
 
-  if (!isAdminOrRegistrar) return null;
+  // Deans and heads of department work from their dashboard and the Staff tab.
+  if (!can.manageStudents) redirect(can.adminArea ? "/admin/people" : "/dashboard");
 
-  const [{ data: courseData }, { data: memberData }] = await Promise.all([
-    supabase
-      .from("courses")
-      .select("id, institution_id, code, title, description, language, level, color, published")
-      .eq("institution_id", institution.id)
-      .order("code"),
-    supabase
-      .from("memberships")
-      .select("user_id, role, profile:profiles(full_name, email)")
-      .eq("institution_id", institution.id),
-  ]);
+  const [{ data: courseData }, { data: memberData }, { data: depData }, { count: rosterTotal }, { count: rosterLinked }, { count: claimCount }] =
+    await Promise.all([
+      supabase
+        .from("courses")
+        .select("id, institution_id, department_id, code, title, description, language, level, color, published")
+        .eq("institution_id", institution.id)
+        .order("code"),
+      supabase.from("memberships").select("user_id, role").eq("institution_id", institution.id),
+      supabase.from("departments").select("id, name").eq("institution_id", institution.id).order("name"),
+      supabase.from("student_roster").select("id", { count: "exact", head: true }).eq("institution_id", institution.id),
+      supabase.from("student_roster").select("id", { count: "exact", head: true }).eq("institution_id", institution.id).not("claimed_by", "is", null),
+      supabase.from("matricule_claims").select("id", { count: "exact", head: true }).eq("institution_id", institution.id).in("status", ["waiting", "disputed"]),
+    ]);
   const courses = (courseData ?? []) as Course[];
-
-  const members = new Map<string, { name: string; email: string; roles: InstitutionRole[] }>();
+  const departments = (depData ?? []) as Array<{ id: string; name: string }>;
+  const deptName = new Map(departments.map((d) => [d.id, d.name]));
+  const rolesByUser = new Map<string, Set<InstitutionRole>>();
   for (const row of (memberData ?? []) as MemberRow[]) {
-    const p = Array.isArray(row.profile) ? row.profile[0] : row.profile;
-    const entry = members.get(row.user_id) ?? { name: p?.full_name || p?.email || "", email: p?.email ?? "", roles: [] };
-    entry.roles.push(row.role);
-    members.set(row.user_id, entry);
+    rolesByUser.set(row.user_id, (rolesByUser.get(row.user_id) ?? new Set()).add(row.role));
   }
-  const memberList = [...members.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name, locale));
-  const countRole = (r: InstitutionRole) => memberList.filter(([, m]) => m.roles.includes(r)).length;
+  const countRole = (r: InstitutionRole) => [...rolesByUser.values()].filter((set) => set.has(r)).length;
+  const staffCount = [...rolesByUser.values()].filter((set) => [...set].some((r) => r !== "student")).length;
 
   // Institution overview: course averages, attendance, latest deliberation outcomes.
   const courseIds = courses.map((c) => c.id);
@@ -99,7 +96,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       <section className="mb-8">
         <h2 className="mb-4 font-display text-2xl font-semibold">{t.analytics.institutionTitle}</h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat label={t.dash.statStudents} value={countRole("student")} hint={`${countRole("teacher")} ${t.admin.roles.teacher.toLowerCase()}s`} />
+          <Stat label={t.dash.statStudents} value={countRole("student")} hint={`${staffCount} ${t.home.staff.toLowerCase()}`} />
           <Stat label={t.dash.statCourses} value={courses.length} />
           <Stat
             label={t.analytics.attendance}
@@ -138,6 +135,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader title={`${t.admin.courses} (${courses.length})`} />
+          {can.manageSchool ? (
           <form action={createCourse} className="grid gap-3 border-b border-slate-100 px-5 py-4 sm:grid-cols-2">
             <input type="hidden" name="institution_id" value={institution.id} />
             <Field label={t.admin.code}>
@@ -157,13 +155,26 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
                 <option value="en">English</option>
               </Select>
             </Field>
-            <Field label={`${t.admin.teacherEmail} (${t.common.optional})`}>
-              <Input name="teacher_email" type="email" />
+            <Field label={t.staffing.department}>
+              <Select name="department_id" defaultValue="">
+                <option value="">—</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </Select>
             </Field>
+            <div className="sm:col-span-2">
+              <Field label={`${t.admin.teacherEmail} (${t.common.optional})`}>
+                <Input name="teacher_email" type="email" />
+              </Field>
+            </div>
             <div className="sm:col-span-2">
               <Button type="submit">{t.admin.newCourse}</Button>
             </div>
           </form>
+          ) : null}
           {courses.length === 0 ? (
             <p className="px-5 py-6 text-sm text-slate-500">{t.dashboard.noCourses}</p>
           ) : (
@@ -174,6 +185,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
                     <span className="h-2.5 w-2.5 shrink-0 rotate-45 rounded-[2px]" style={{ backgroundColor: c.color }} />
                     <span className="num w-20 shrink-0 text-[13px] font-extrabold text-slate-600">{c.code}</span>
                     <span className="min-w-0 flex-1 truncate text-sm text-slate-900">{c.title}</span>
+                    {c.department_id ? <span className="hidden truncate text-[13px] text-slate-500 sm:inline">{deptName.get(c.department_id)}</span> : null}
                     {c.level ? <Badge>{c.level}</Badge> : null}
                   </Link>
                 </li>
@@ -182,42 +194,35 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           )}
         </Card>
 
-        <Card>
-          <CardHeader title={`${t.admin.members} (${memberList.length})`} />
-          <form action={addMember} className="grid gap-3 border-b border-slate-100 px-5 py-4 sm:grid-cols-[1fr_160px_auto] sm:items-end">
-            <input type="hidden" name="institution_id" value={institution.id} />
-            <Field label={t.common.email}>
-              <Input name="email" type="email" required />
-            </Field>
-            <Field label={t.common.role}>
-              <Select name="role" defaultValue="student">
-                <option value="student">{t.admin.roles.student}</option>
-                <option value="teacher">{t.admin.roles.teacher}</option>
-                <option value="registrar">{t.admin.roles.registrar}</option>
-                {isAdmin ? <option value="admin">{t.admin.roles.admin}</option> : null}
-              </Select>
-            </Field>
-            <Button type="submit">{t.common.add}</Button>
-          </form>
-          <ul className="max-h-[480px] divide-y divide-slate-100 overflow-y-auto">
-            {memberList.map(([id, m]) => (
-              <li key={id} className="flex items-center gap-3 px-5 py-3">
-                <Avatar name={m.name || m.email} size={32} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900">{m.name}</p>
-                  <p className="truncate text-xs text-slate-500">{m.email}</p>
-                </div>
-                <div className="flex flex-wrap justify-end gap-1">
-                  {m.roles.map((r) => (
-                    <Badge key={r} tone={r === "student" ? "info" : "brand"}>
-                      {t.admin.roles[r]}
-                    </Badge>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <div className="space-y-6">
+          <Link href="/admin/people" className="block">
+            <Card lifted className="flex items-center gap-4 p-5 transition-colors hover:border-ardoise">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-ardoise text-chalk">
+                <Users size={20} aria-hidden />
+              </span>
+              <div className="flex-1">
+                <p className="font-display text-xl font-semibold">{t.staffing.title}</p>
+                <p className="text-[14px] text-slate-600">
+                  {staffCount} {t.home.staff.toLowerCase()} · {t.staffing.invite}
+                </p>
+              </div>
+            </Card>
+          </Link>
+          <Link href="/admin/students" className="block">
+            <Card lifted className="flex items-center gap-4 p-5 transition-colors hover:border-ardoise">
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-ochre-500 text-[#12100C]">
+                <ClipboardList size={20} aria-hidden />
+              </span>
+              <div className="flex-1">
+                <p className="font-display text-xl font-semibold">{t.roster.title}</p>
+                <p className="text-[14px] text-slate-600">
+                  {fmt(t.roster.signedUp, { n: rosterLinked ?? 0, total: rosterTotal ?? 0 })}
+                  {claimCount ? ` · ${fmt(t.home.claimsWaiting, { n: claimCount })}` : ""}
+                </p>
+              </div>
+            </Card>
+          </Link>
+        </div>
       </div>
     </>
   );

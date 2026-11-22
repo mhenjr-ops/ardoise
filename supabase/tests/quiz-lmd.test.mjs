@@ -1,18 +1,19 @@
 // Sprint 2 checks: quiz engine and LMD deliberation workflow.
 import { setup } from './harness.mjs';
 
-const { db, ids, as, check, expectError, done, fail } = await setup(['A', 'T', 'S1', 'S2', 'X']);
+const { db, ids, as, check, expectError, done, fail, createSchool } = await setup(['A', 'T', 'S1', 'S2', 'X']);
 
 try {
   // ----- School, course, people -----
-  const inst = (await as('A', `select public.create_institution('Institut Démo', 'demo') id`)).rows[0].id;
+  const inst = await createSchool('A', 'Institut Démo', 'demo');
   for (const [email, role] of [['t@demo.cm', 'teacher'], ['s1@demo.cm', 'student'], ['s2@demo.cm', 'student']]) {
     await as('A', `select public.add_member_by_email($1, $2, $3)`, [inst, email, role]);
   }
   const policy = await as('A', `select pass_mark from public.grading_policies where institution_id = $1`, [inst]);
   check('default grading policy created with the institution', Number(policy.rows[0]?.pass_mark) === 10);
 
-  const course = (await as('T', `insert into public.courses (institution_id, code, title) values ($1, 'INF101', 'Algo') returning id`, [inst])).rows[0].id;
+  const course = (await as('A', `insert into public.courses (institution_id, code, title) values ($1, 'INF101', 'Algo') returning id`, [inst])).rows[0].id;
+  await as('A', `select public.enroll_by_email($1, 't@demo.cm', 'teacher')`, [course]);
   await as('T', `select public.enroll_by_email($1, 's1@demo.cm', 'student')`, [course]);
   await as('T', `select public.enroll_by_email($1, 's2@demo.cm', 'student')`, [course]);
 
@@ -177,7 +178,7 @@ try {
   check('draft deliberation deleted with its results', (await as('A', `select id from public.deliberation_results where deliberation_id = $1`, [d2])).rows.length === 0);
 
   // Cross-tenant
-  const instX = (await as('X', `select public.create_institution('Other', 'other') id`)).rows[0].id;
+  const instX = await createSchool('X', 'Other', 'other');
   check('X sees no deliberations of demo', (await as('X', `select id from public.deliberations`)).rows.length === 0);
   await expectError('X cannot register students in demo', () => as('X', `select public.register_students($1, $2, 'L1', array['s1@demo.cm'])`, [prog, year]), 'forbidden');
   await expectError('X cannot hang a UE on demo programme', () => as('X', `insert into public.teaching_units (institution_id, programme_id, code, title, credits) values ($1, $2, 'HACK', 'x', 1)`, [instX, prog]), 'invalid');

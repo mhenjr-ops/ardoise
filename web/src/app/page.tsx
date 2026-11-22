@@ -83,6 +83,9 @@ export default async function Landing() {
               </Link>
             ) : (
               <>
+                <Link href="/request-demo" className="hidden h-10 items-center rounded-full px-4 text-[15px] font-semibold text-chalk/90 hover:bg-white/10 lg:flex">
+                  {t.access.requestDemoLink}
+                </Link>
                 <Link href="/login" className="hidden h-10 items-center rounded-full px-4 text-[15px] font-semibold text-chalk/90 hover:bg-white/10 sm:flex">
                   {L.ctaSignIn}
                 </Link>

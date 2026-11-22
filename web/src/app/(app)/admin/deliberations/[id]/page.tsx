@@ -37,7 +37,7 @@ const ueClass: Record<UEResult["status"], string> = {
 export default async function DeliberationPage({ params, searchParams }: PageProps<"/admin/deliberations/[id]">) {
   const { id } = await params;
   const q = await searchParams;
-  const [{ supabase, isAdmin }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
+  const [{ supabase, can }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
   const d = await loadDeliberation(supabase, id);
   if (!d) notFound();
 
@@ -62,7 +62,8 @@ export default async function DeliberationPage({ params, searchParams }: PagePro
   const transcripts = new Map(((trData ?? []) as Array<{ id: string; student_id: string }>).map((x) => [x.student_id, x.id]));
   const programme = one(d.programme);
   const semester = one(d.semester);
-  const draft = d.status === "draft";
+  // Deans and admins read; only the registrar (and the owner) act on a deliberation.
+  const draft = d.status === "draft" && can.runResults;
   const nameOf = (sid: string) => results.find((r) => r.student_id === sid)?.student_name ?? sid.slice(0, 8);
   const ueCode = (uid: string) => ues.find((u) => u.id === uid)?.code ?? "—";
 
@@ -112,7 +113,7 @@ export default async function DeliberationPage({ params, searchParams }: PagePro
             ) : null}
           </>
         ) : null}
-        {d.status === "locked" ? (
+        {d.status === "locked" && can.runResults ? (
           <>
             <form action={setStatus}>
               <input type="hidden" name="id" value={id} />
@@ -122,7 +123,7 @@ export default async function DeliberationPage({ params, searchParams }: PagePro
                 {t.lmd.publish}
               </Button>
             </form>
-            {isAdmin ? (
+            {can.isOwner ? (
               <form action={setStatus}>
                 <input type="hidden" name="id" value={id} />
                 <input type="hidden" name="status" value="draft" />
@@ -140,7 +141,7 @@ export default async function DeliberationPage({ params, searchParams }: PagePro
             {t.lmd.pv}
           </a>
         ) : null}
-        {d.status === "published" ? (
+        {d.status === "published" && can.runResults ? (
           <form action={issueTranscripts}>
             <input type="hidden" name="id" value={id} />
             <Button type="submit" variant="secondary">

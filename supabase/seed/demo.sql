@@ -2,7 +2,7 @@
 -- modules, pages, assignments, a full semester of marks and a quiz.
 --
 -- Run once, after all migrations, in the Supabase SQL editor (or through the
--- Supabase connector), then run demo-engage.sql. It runs as the database owner,
+-- Supabase connector), then demo-engage.sql and demo-roles.sql. It runs as the database owner,
 -- so it creates the login accounts directly. Password for every account: Ardoise2026!
 
 do $seed$
@@ -77,7 +77,7 @@ begin
   -- Institution and members
   insert into public.institutions (name, slug) values ('Institut Supérieur Démo de Yaoundé', 'isdy') returning id into v_inst;
   insert into public.memberships (institution_id, user_id, role) values
-    (v_inst, u_admin, 'admin'), (v_inst, u_admin, 'registrar'),
+    (v_inst, u_admin, 'owner'),
     (v_inst, u_mbarga, 'teacher'), (v_inst, u_bello, 'teacher'),
     (v_inst, u_brenda, 'student'), (v_inst, u_cedric, 'student'), (v_inst, u_mireille, 'student'),
     (v_inst, u_yannick, 'student'), (v_inst, u_ines, 'student');

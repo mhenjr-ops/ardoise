@@ -25,7 +25,7 @@ check('8 login accounts', (await n('select count(*) n from auth.users')) === 8);
 check('8 identities', (await n('select count(*) n from auth.identities')) === 8);
 check('8 profiles via trigger', (await n('select count(*) n from public.profiles')) === 8);
 check('names and locale on profiles', (await n(`select count(*) n from public.profiles where full_name = 'Dr Aïcha Bello' and locale = 'en'`)) === 1);
-check('9 memberships', (await n('select count(*) n from public.memberships')) === 9);
+check('8 memberships (owner, 2 teachers, 5 students)', (await n('select count(*) n from public.memberships')) === 8);
 check('3 courses mapped to UEs', (await n('select count(*) n from public.courses where teaching_unit_id is not null and semester_id is not null')) === 3);
 check('18 enrolments', (await n('select count(*) n from public.enrollments')) === 18);
 check('scope trigger filled institution on assignments', (await n('select count(*) n from public.assignments where institution_id is null')) === 0);

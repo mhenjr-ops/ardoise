@@ -18,7 +18,7 @@ type Row = {
 const statusTone = { draft: "neutral", locked: "warn", published: "brand" } as const;
 
 export default async function DeliberationsPage({ searchParams }: PageProps<"/admin/deliberations">) {
-  const [{ supabase, institution }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
+  const [{ supabase, institution, can }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
   const { error } = await searchParams;
 
   const [{ data }, { data: progData }, { data: semData }] = await Promise.all([
@@ -44,6 +44,7 @@ export default async function DeliberationsPage({ searchParams }: PageProps<"/ad
   return (
     <div className="space-y-6">
       <Flash error={errorText(t, typeof error === "string" ? error : null)} />
+      {can.runResults ? (
       <Card>
         <CardHeader title={t.lmd.newDeliberation} />
         <form action={createDeliberation} className="grid items-end gap-3 px-5 py-4 sm:grid-cols-[1.5fr_1fr_100px_auto]">
@@ -78,6 +79,7 @@ export default async function DeliberationsPage({ searchParams }: PageProps<"/ad
           </Button>
         </form>
       </Card>
+      ) : null}
 
       <Card className="overflow-hidden">
         <CardHeader title={t.lmd.deliberations} />

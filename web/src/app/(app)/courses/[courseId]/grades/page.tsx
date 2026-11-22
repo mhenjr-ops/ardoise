@@ -12,7 +12,7 @@ type StudentRow = { user_id: string; profile: { full_name: string; email: string
 
 export default async function GradesPage({ params }: PageProps<"/courses/[courseId]/grades">) {
   const { courseId } = await params;
-  const [{ supabase, course, isStaff, user }, { t, locale }] = await Promise.all([getCourseContext(courseId), getI18n()]);
+  const [{ supabase, course, isStaff, canSeeStaffViews, user }, { t, locale }] = await Promise.all([getCourseContext(courseId), getI18n()]);
 
   const [{ data: aData }, { data: gData }, { data: sData }] = await Promise.all([
     supabase
@@ -21,7 +21,7 @@ export default async function GradesPage({ params }: PageProps<"/courses/[course
       .eq("course_id", course.id)
       .order("due_at", { ascending: true, nullsFirst: false }),
     supabase.from("grades").select("id, assignment_id, student_id, score, comment, graded_at").eq("course_id", course.id),
-    isStaff
+    canSeeStaffViews
       ? supabase.from("enrollments").select("user_id, profile:profiles(full_name, email)").eq("course_id", course.id).eq("role", "student")
       : Promise.resolve({ data: [] }),
   ]);
@@ -30,7 +30,7 @@ export default async function GradesPage({ params }: PageProps<"/courses/[course
 
   if (assignments.length === 0) return <Empty>{t.grades.noGrades}</Empty>;
 
-  if (!isStaff) {
+  if (!canSeeStaffViews) {
     const rows = assignments.map((a) => {
       const g = grades.find((row) => row.assignment_id === a.id && row.student_id === user.id);
       return {
@@ -88,9 +88,13 @@ export default async function GradesPage({ params }: PageProps<"/courses/[course
                 <th className="sticky left-0 z-10 bg-slate-50 px-4 py-3 font-semibold text-slate-700">{t.grades.student}</th>
                 {assignments.map((a) => (
                   <th key={a.id} className="min-w-28 px-3 py-3 font-medium text-slate-600">
-                    <Link href={`/courses/${course.id}/assignments/${a.id}/grade`} className="hover:text-brand-700">
+                    {isStaff ? (
+                      <Link href={`/courses/${course.id}/assignments/${a.id}/grade`} className="hover:text-brand-700">
+                        <span className="line-clamp-2">{a.title}</span>
+                      </Link>
+                    ) : (
                       <span className="line-clamp-2">{a.title}</span>
-                    </Link>
+                    )}
                     <span className="block text-xs font-normal text-slate-400">
                       /{formatScore(locale, a.points_possible)} · ×{formatScore(locale, a.weight)}
                     </span>
@@ -112,9 +116,15 @@ export default async function GradesPage({ params }: PageProps<"/courses/[course
                       const low = g && g.score !== null && toTwenty(Number(g.score), Number(a.points_possible)) < 10;
                       return (
                         <td key={a.id} className={`px-3 py-2.5 num ${low ? "font-bold text-terracotta-600" : "text-slate-700"}`}>
-                          <Link href={`/courses/${course.id}/assignments/${a.id}/grade?student=${s.id}`} className="block hover:underline">
-                            {g && g.score !== null ? formatScore(locale, g.score) : "–"}
-                          </Link>
+                          {isStaff ? (
+                            <Link href={`/courses/${course.id}/assignments/${a.id}/grade?student=${s.id}`} className="block hover:underline">
+                              {g && g.score !== null ? formatScore(locale, g.score) : "–"}
+                            </Link>
+                          ) : g && g.score !== null ? (
+                            formatScore(locale, g.score)
+                          ) : (
+                            "–"
+                          )}
                         </td>
                       );
                     })}

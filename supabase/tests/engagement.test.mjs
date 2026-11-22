@@ -2,19 +2,20 @@
 // attendance check-in and course files.
 import { setup } from './harness.mjs';
 
-const { db, ids, as, check, expectError, done } = await setup(['A', 'T', 'S1', 'S2', 'X', 'XA']);
+const { db, ids, as, check, expectError, done, createSchool } = await setup(['A', 'T', 'S1', 'S2', 'X', 'XA']);
 const one = async (user, sql, params) => (await as(user, sql, params)).rows[0];
 const count = async (user, sql, params) => Number((await as(user, sql, params)).rows[0].n);
 
 // ----- Two schools; the course lives in the first -----
-const inst = (await one('A', `select public.create_institution('Institut Démo', 'demo') id`)).id;
+const inst = await createSchool('A', 'Institut Démo', 'demo');
 for (const [email, role] of [['t@demo.cm', 'teacher'], ['s1@demo.cm', 'student'], ['s2@demo.cm', 'student']]) {
   await as('A', `select public.add_member_by_email($1, $2, $3)`, [inst, email, role]);
 }
-const other = (await one('XA', `select public.create_institution('Autre école', 'autre') id`)).id;
+const other = await createSchool('XA', 'Autre école', 'autre');
 await as('XA', `select public.add_member_by_email($1, 'x@demo.cm', 'student')`, [other]);
 
-const course = (await one('T', `insert into public.courses (institution_id, code, title) values ($1, 'INF101', 'Algo') returning id`, [inst])).id;
+const course = (await one('A', `insert into public.courses (institution_id, code, title) values ($1, 'INF101', 'Algo') returning id`, [inst])).id;
+await as('A', `select public.enroll_by_email($1, 't@demo.cm', 'teacher')`, [course]);
 await as('T', `select public.enroll_by_email($1, 's1@demo.cm', 'student')`, [course]);
 await as('T', `select public.enroll_by_email($1, 's2@demo.cm', 'student')`, [course]);
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { BookOpenCheck, GraduationCap, School } from "lucide-react";
+import { BookOpenCheck, Building2, ClipboardList, GraduationCap, School } from "lucide-react";
 import { getI18n } from "@/lib/i18n/server";
 import { DEMO_ENABLED } from "@/lib/demo";
 import { NDOP_CHALK } from "@/lib/ndop";
@@ -19,18 +19,30 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { t, locale } = await getI18n();
   const params = await searchParams;
   const isSignup = params.mode === "signup";
+  const nextRaw = typeof params.next === "string" ? params.next : "";
+  const next = nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "";
+  const invited = next.startsWith("/join/");
+  const withNext = (path: string) => (next ? `${path}${path.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}` : path);
   const error =
     params.error === "invalid"
-      ? t.auth.invalid
+      ? isSignup
+        ? t.errors.invalid
+        : t.access.invalid
       : params.error === "weak"
         ? t.auth.weakPassword
-        : params.error
-          ? t.errors.generic
-          : null;
+        : params.error === "too_many"
+          ? t.access.tooMany
+          : params.error === "exists"
+            ? t.errors.duplicate
+            : params.error
+              ? t.errors.generic
+              : null;
   const ok = params.ok === "check" ? t.auth.checkEmail : null;
 
   const demoRoles = [
     { role: "admin", label: t.demo.admin, icon: <School size={18} aria-hidden /> },
+    { role: "registrar", label: t.demo.registrar, icon: <ClipboardList size={18} aria-hidden /> },
+    { role: "hod", label: t.demo.hod, icon: <Building2 size={18} aria-hidden /> },
     { role: "teacher", label: t.demo.teacher, icon: <BookOpenCheck size={18} aria-hidden /> },
     { role: "student", label: t.demo.student, icon: <GraduationCap size={18} aria-hidden /> },
   ];
@@ -62,20 +74,39 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <div className="flex flex-1 items-center justify-center px-6 pb-12">
           <div className="w-full max-w-[400px]">
             <h1 className="font-display text-[2.2rem] font-semibold leading-tight">
-              {isSignup ? t.auth.signUpTitle : t.auth.signInTitle}
+              {isSignup ? (invited ? t.join.createAccount : t.access.studentSignUp) : t.auth.signInTitle}
             </h1>
-            <p className="mb-7 mt-1.5 text-[15px] text-slate-500">{t.auth.tagline}</p>
+            <p className="mb-7 mt-1.5 text-[15px] text-slate-500">
+              {isSignup && !invited ? t.access.studentSignUpIntro : t.auth.tagline}
+            </p>
             <Flash error={error} ok={ok} />
 
             <form action={isSignup ? signUp : signIn} className="space-y-4">
+              {next ? <input type="hidden" name="next" value={next} /> : null}
+              {isSignup && !invited ? (
+                <div className="grid grid-cols-[0.8fr_1.2fr] gap-3">
+                  <Field label={t.access.schoolCode} hint={t.access.schoolCodeHelp}>
+                    <Input name="school_code" required autoCapitalize="characters" autoComplete="off" placeholder="UBA" />
+                  </Field>
+                  <Field label={t.access.matricule}>
+                    <Input name="matricule" required autoCapitalize="characters" autoComplete="username" placeholder="UBa21E0123" />
+                  </Field>
+                </div>
+              ) : null}
               {isSignup ? (
-                <Field label={t.auth.fullName}>
+                <Field label={invited ? t.auth.fullName : t.access.nameAsOnRecords}>
                   <Input name="full_name" required autoComplete="name" />
                 </Field>
               ) : null}
-              <Field label={t.auth.email}>
-                <Input name="email" type="email" required autoComplete="email" inputMode="email" />
-              </Field>
+              {isSignup ? (
+                <Field label={t.auth.email}>
+                  <Input name="email" type="email" required autoComplete="email" inputMode="email" />
+                </Field>
+              ) : (
+                <Field label={t.access.identifier} hint={t.access.identifierHelp}>
+                  <Input name="identifier" required autoComplete="username" autoCapitalize="none" />
+                </Field>
+              )}
               <Field label={t.auth.password}>
                 <Input
                   name="password"
@@ -92,12 +123,28 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
 
             <p className="mt-5 text-center text-[15px] text-slate-600">
               {isSignup ? t.auth.haveAccount : t.auth.noAccount}{" "}
-              <Link href={isSignup ? "/login" : "/login?mode=signup"} className="font-semibold text-brand-600 hover:underline">
-                {isSignup ? t.auth.signIn : t.auth.signUpTitle}
+              <Link
+                href={isSignup ? withNext("/login") : withNext("/login?mode=signup")}
+                className="font-semibold text-brand-600 hover:underline"
+              >
+                {isSignup ? t.auth.signIn : invited ? t.join.createAccount : t.access.studentSignUp}
               </Link>
             </p>
+            {isSignup && !invited ? (
+              <p className="mt-3 rounded-xl bg-paper px-4 py-3 text-center text-[14px] text-slate-600 ring-1 ring-slate-200">
+                {t.access.staffNote}
+              </p>
+            ) : null}
+            {!isSignup && !next ? (
+              <p className="mt-3 text-center text-[14px] text-slate-500">
+                {t.access.requestDemo}{" "}
+                <Link href="/request-demo" className="font-semibold text-brand-600 hover:underline">
+                  {t.access.requestDemoLink}
+                </Link>
+              </p>
+            ) : null}
 
-            {DEMO_ENABLED && !isSignup ? (
+            {DEMO_ENABLED && !isSignup && !next ? (
               <div id="demo" className="mt-9 rounded-2xl border border-ochre-200 bg-ochre-50/70 p-5">
                 <p className="font-display text-xl font-semibold">{t.demo.title}</p>
                 <p className="mt-1 text-[14px] text-slate-600">{t.demo.body}</p>

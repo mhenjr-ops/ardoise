@@ -1,4 +1,5 @@
 import { enEngage, frEngage, type EngageMessages } from "./messages-engage";
+import { enRoles, frRoles, type RolesMessages } from "./messages-roles";
 
 export type Locale = "fr" | "en";
 export const LOCALES: Locale[] = ["fr", "en"];
@@ -358,6 +359,15 @@ const fr = {
     duplicate: "Cet élément existe déjà.",
     topic_locked: "Ce sujet est fermé aux nouvelles réponses.",
     file_too_big: "Fichier trop volumineux.",
+    last_owner: "L'établissement doit garder au moins un responsable.",
+    invalid_role: "Ce rôle ne peut pas être attribué ainsi.",
+    invitation_invalid: "Ce lien d'invitation n'est pas valide.",
+    invitation_used: "Cette invitation a déjà été utilisée.",
+    invitation_expired: "Cette invitation a expiré.",
+    invitation_wrong_email: "Cette invitation est réservée à une autre adresse e-mail.",
+    too_many_attempts: "Trop d'essais. Patientez quelques minutes.",
+    too_many_requests: "Trop de demandes. Réessayez plus tard.",
+    matricule_not_listed: "Ce matricule n'est pas sur la liste des étudiants.",
   },
 };
 
@@ -718,14 +728,23 @@ const en: CoreMessages = {
     duplicate: "This already exists.",
     topic_locked: "This topic is closed to new replies.",
     file_too_big: "File too large.",
+    last_owner: "The school must keep at least one owner.",
+    invalid_role: "This role can't be given this way.",
+    invitation_invalid: "This invitation link isn't valid.",
+    invitation_used: "This invitation has already been used.",
+    invitation_expired: "This invitation has expired.",
+    invitation_wrong_email: "This invitation is for another email address.",
+    too_many_attempts: "Too many attempts. Wait a few minutes.",
+    too_many_requests: "Too many requests. Try again later.",
+    matricule_not_listed: "This matricule isn't on the student list.",
   },
 };
 
-export type Messages = CoreMessages & EngageMessages;
+export type Messages = CoreMessages & EngageMessages & RolesMessages;
 
 export const messages: Record<Locale, Messages> = {
-  fr: { ...fr, ...frEngage },
-  en: { ...en, ...enEngage },
+  fr: { ...fr, ...frEngage, ...frRoles },
+  en: { ...en, ...enEngage, ...enRoles },
 };
 
 export function isLocale(value: unknown): value is Locale {

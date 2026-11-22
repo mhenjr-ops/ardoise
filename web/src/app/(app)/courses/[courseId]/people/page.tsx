@@ -14,8 +14,15 @@ type Row = {
 export default async function PeoplePage({ params, searchParams }: PageProps<"/courses/[courseId]/people">) {
   const { courseId } = await params;
   const { error, ok } = await searchParams;
-  const [{ supabase, course, isStaff, user }, { t, locale }] = await Promise.all([getCourseContext(courseId), getI18n()]);
-  if (!isStaff) redirect(`/courses/${courseId}`);
+  const [{ supabase, course, isStaff, canStaff, canSeeStaffViews, user }, { t, locale }] = await Promise.all([
+    getCourseContext(courseId),
+    getI18n(),
+  ]);
+  if (!canSeeStaffViews) redirect(`/courses/${courseId}`);
+  // Teachers manage the students of their course; the school (admin, registrar, dean, head)
+  // assigns teachers. Readers without either power just see the list.
+  const canAdd = isStaff || canStaff;
+  const removable = (role: CourseRole) => canStaff || (isStaff && role === "student");
 
   const { data } = await supabase
     .from("enrollments")
@@ -32,6 +39,7 @@ export default async function PeoplePage({ params, searchParams }: PageProps<"/c
   return (
     <div className="space-y-4">
       <Flash error={errorText(t, typeof error === "string" ? error : null)} ok={ok ? t.common.saved : null} />
+      {canAdd ? (
       <Card className="p-5">
         <form action={enrollPerson} className="grid gap-3 sm:grid-cols-[1fr_180px_auto] sm:items-end">
           <input type="hidden" name="course_id" value={course.id} />
@@ -39,10 +47,9 @@ export default async function PeoplePage({ params, searchParams }: PageProps<"/c
             <Input name="email" type="email" required placeholder="etudiant@exemple.cm" />
           </Field>
           <Field label={t.common.role}>
-            <Select name="role" defaultValue="student">
+            <Select name="role" defaultValue={canStaff && !isStaff ? "teacher" : "student"}>
               <option value="student">{t.people.roles.student}</option>
-              <option value="ta">{t.people.roles.ta}</option>
-              <option value="teacher">{t.people.roles.teacher}</option>
+              {canStaff ? <option value="teacher">{t.people.roles.teacher}</option> : null}
             </Select>
           </Field>
           <Button type="submit" className="sm:mb-5">
@@ -50,6 +57,7 @@ export default async function PeoplePage({ params, searchParams }: PageProps<"/c
           </Button>
         </form>
       </Card>
+      ) : null}
 
       <Card className="overflow-hidden">
         <ul className="divide-y divide-slate-100">
@@ -63,7 +71,7 @@ export default async function PeoplePage({ params, searchParams }: PageProps<"/c
                 <p className="truncate text-xs text-slate-500">{p.email}</p>
               </div>
               <Badge tone={p.role === "student" ? "info" : "brand"}>{t.people.roles[p.role]}</Badge>
-              {p.id !== user.id ? (
+              {p.id !== user.id && removable(p.role) ? (
                 <form action={unenroll}>
                   <input type="hidden" name="course_id" value={course.id} />
                   <input type="hidden" name="user_id" value={p.id} />

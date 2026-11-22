@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseKey, supabaseUrl } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/", "/login", "/auth", "/verify", "/app", "/api/demo-session"];
+const PUBLIC_PATHS = ["/", "/login", "/auth", "/verify", "/app", "/api/demo-session", "/join", "/request-demo"];
 
 /** Refreshes the Supabase session cookie and sends signed-out visitors to /login. */
 export async function updateSession(request: NextRequest) {
@@ -37,8 +37,9 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && path === "/login") {
+    const next = request.nextUrl.searchParams.get("next") ?? "";
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = next.startsWith("/") && !next.startsWith("//") ? next.split("?")[0] : "/dashboard";
     url.search = "";
     return NextResponse.redirect(url);
   }
