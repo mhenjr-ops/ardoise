@@ -5,7 +5,8 @@ import { getSession } from "@/lib/session";
 import { errorText, getI18n } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/messages-engage";
 import { formatDate } from "@/lib/format";
-import { Button, Card, Field, Flash, Input, PageHeader, buttonClass } from "@/components/ui";
+import { finishJoining, schoolDirectory } from "@/lib/joining";
+import { Button, Card, Field, Flash, Input, PageHeader, Select, buttonClass } from "@/components/ui";
 import { claimMatricule, disputeMatricule } from "./actions";
 
 type Claim = { matricule: string; status: string; created_at: string; institution: { name: string; slug: string } | { name: string; slug: string }[] | null };
@@ -16,8 +17,15 @@ export default async function OnboardingPage({ searchParams }: PageProps<"/onboa
   const params = await searchParams;
   const str = (k: string) => (typeof params[k] === "string" ? (params[k] as string) : "");
   const claim = str("claim");
-  const school = str("school") || String(user.user_metadata?.school_code ?? "");
+  // Finish what the account was created for (an invitation or a matricule), in case the
+  // confirmation email brought the person here instead of through the callback.
+  if (!claim && !str("error")) {
+    const target = await finishJoining(supabase, user);
+    if (target) redirect(target as Parameters<typeof redirect>[0]);
+  }
+  const school = (str("school") || String(user.user_metadata?.school_code ?? "")).toLowerCase();
   const matricule = str("matricule") || String(user.user_metadata?.matricule ?? "");
+  const schools = await schoolDirectory(supabase);
 
   const { data: claims } = await supabase
     .from("matricule_claims")
@@ -27,7 +35,7 @@ export default async function OnboardingPage({ searchParams }: PageProps<"/onboa
     .order("created_at", { ascending: false });
   const open = ((claims ?? []) as Claim[]).map((c) => ({ ...c, institution: Array.isArray(c.institution) ? c.institution[0] : c.institution }));
 
-  const schoolName = open.find((c) => c.institution?.slug === school.toLowerCase())?.institution?.name ?? school.toUpperCase();
+  const schoolName = schools.find((s) => s.slug === school)?.name ?? school.toUpperCase();
   const messages: Record<string, string> = {
     waiting: fmt(t.onboard.waiting, { institution: schoolName }),
     taken: t.onboard.taken,
@@ -83,14 +91,21 @@ export default async function OnboardingPage({ searchParams }: PageProps<"/onboa
           </h2>
           <p className="mb-5 mt-1.5 text-[14.5px] text-slate-600">{t.onboard.studentBody}</p>
           <form action={claimMatricule} className="space-y-4">
-            <div className="grid grid-cols-[0.8fr_1.2fr] gap-3">
-              <Field label={t.access.schoolCode}>
-                <Input name="school_code" required defaultValue={school.toUpperCase()} autoCapitalize="characters" placeholder="UBA" />
-              </Field>
-              <Field label={t.access.matricule}>
-                <Input name="matricule" required defaultValue={matricule} autoCapitalize="characters" />
-              </Field>
-            </div>
+            <Field label={t.access.university} hint={t.access.universityHelp}>
+              <Select name="school" required defaultValue={schools.some((s) => s.slug === school) ? school : ""}>
+                <option value="" disabled>
+                  {t.access.chooseUniversity}
+                </option>
+                {schools.map((s) => (
+                  <option key={s.slug} value={s.slug}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label={t.access.matricule}>
+              <Input name="matricule" required defaultValue={matricule} autoCapitalize="characters" />
+            </Field>
             <Field label={t.access.nameAsOnRecords}>
               <Input name="full_name" required defaultValue={profile.full_name} autoComplete="name" />
             </Field>
@@ -98,7 +113,7 @@ export default async function OnboardingPage({ searchParams }: PageProps<"/onboa
           </form>
           {claim === "taken" ? (
             <form action={disputeMatricule} className="mt-4 border-t border-slate-100 pt-4">
-              <input type="hidden" name="school_code" value={school} />
+              <input type="hidden" name="school" value={school} />
               <input type="hidden" name="matricule" value={matricule} />
               <Button type="submit" variant="secondary">
                 {t.onboard.dispute}

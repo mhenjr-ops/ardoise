@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Building2, MailCheck, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { isInviteToken, schoolDirectory } from "@/lib/joining";
 import { getI18n } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/messages-engage";
 import type { InstitutionRole } from "@/lib/types";
@@ -29,6 +31,17 @@ export default async function JoinPage({ params, searchParams }: PageProps<"/joi
   const { error } = await searchParams;
   const { t, locale } = await getI18n();
   const supabase = await createClient();
+
+  // /join/<school>: the school's own link for students (e.g. /join/uba).
+  if (!isInviteToken(token)) {
+    const slug = token.toLowerCase().slice(0, 60);
+    const school = (await schoolDirectory(supabase)).find((s) => s.slug === slug);
+    if (school) {
+      const { data: me } = await supabase.auth.getUser();
+      redirect(me.user ? `/onboarding?school=${school.slug}` : `/login?mode=signup&school=${school.slug}`);
+    }
+  }
+
   const [{ data }, { data: auth }] = await Promise.all([
     supabase.rpc("invitation_preview", { p_token: token.slice(0, 100) }),
     supabase.auth.getUser(),

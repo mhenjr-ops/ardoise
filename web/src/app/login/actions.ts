@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "@/lib/i18n/server";
+import { finishJoining, isInviteToken } from "@/lib/joining";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -42,21 +43,31 @@ export async function signIn(formData: FormData) {
   redirect(next);
 }
 
-/** Students sign up with their school code and matricule; invited staff (coming from a
- *  /join link) only need a name, email and password. */
+/** Students sign up with their university (picked from the list or set by the school's
+ *  link) and matricule; invited staff (coming from a /join invitation) only need a name,
+ *  email and password. What the account is for is saved on it, so it is finished after
+ *  the confirmation email whatever address the email link comes back to. */
 export async function signUp(formData: FormData) {
   const email = text(formData, "email");
   const password = String(formData.get("password") ?? "");
   const fullName = text(formData, "full_name");
-  const schoolCode = text(formData, "school_code").toLowerCase();
-  const matricule = text(formData, "matricule").toUpperCase();
+  const school = text(formData, "school").toLowerCase().slice(0, 60);
+  const fromLink = formData.get("from_link") === "1";
+  const matricule = text(formData, "matricule").toUpperCase().slice(0, 40);
   const next = safeNext(formData.get("next"));
-  const invited = next.startsWith("/join/");
+  const invite = next.startsWith("/join/") ? next.slice("/join/".length) : "";
   const again = (error: string): never =>
-    redirect(back("/login", { mode: "signup", error, ...(next !== "/dashboard" ? { next } : {}) }));
+    redirect(
+      back("/login", {
+        mode: "signup",
+        error,
+        ...(next !== "/dashboard" ? { next } : {}),
+        ...(school ? (fromLink ? { school } : { pick: school }) : {}),
+      }),
+    );
   if (password.length < 8) again("weak");
   if (!email || fullName.length < 2) again("invalid");
-  if (!invited && (!schoolCode || matricule.length < 2)) again("invalid");
+  if (invite ? !isInviteToken(invite) : !school || matricule.length < 2) again("invalid");
 
   const origin = (await headers()).get("origin") ?? "";
   const locale = await getLocale();
@@ -65,29 +76,21 @@ export async function signUp(formData: FormData) {
     email,
     password,
     options: {
-      data: { full_name: fullName, locale, ...(invited ? {} : { school_code: schoolCode, matricule }) },
-      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(invited ? next : "/onboarding")}`,
+      data: { full_name: fullName, locale, ...(invite ? { invite } : { school_code: school, matricule }) },
+      emailRedirectTo: `${origin}/auth/callback`,
     },
   });
   if (error) again(error.message.toLowerCase().includes("already") ? "exists" : "generic");
-  if (!data.session) redirect(back("/login", { ok: "check" }));
-  if (invited) redirect(next);
-  // Link the matricule straight away; onboarding shows the outcome.
-  const { data: claim } = await supabase.rpc("claim_matricule", {
-    p_school: schoolCode,
-    p_matricule: matricule,
-    p_full_name: fullName,
-  });
-  const status = (claim as { status?: string } | null)?.status ?? "generic";
-  redirect(status === "linked" ? "/dashboard" : back("/onboarding", { claim: status, school: schoolCode, matricule }));
+  if (!data.session || !data.user) redirect(back("/login", { ok: invite ? "check_invite" : "check" }));
+  redirect((await finishJoining(supabase, data.user)) ?? "/dashboard");
 }
 
 export async function demoSignIn(formData: FormData) {
   const { DEMO_ACCOUNTS, DEMO_ENABLED, DEMO_PASSWORD } = await import("@/lib/demo");
   const role = String(formData.get("role") ?? "") as keyof typeof DEMO_ACCOUNTS;
-  if (!DEMO_ENABLED || !(role in DEMO_ACCOUNTS)) redirect("/login");
+  if (!DEMO_ENABLED || !(role in DEMO_ACCOUNTS)) redirect("/demo");
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email: DEMO_ACCOUNTS[role], password: DEMO_PASSWORD });
-  if (error) redirect("/login?error=demo");
+  if (error) redirect("/demo?error=1");
   redirect("/dashboard");
 }

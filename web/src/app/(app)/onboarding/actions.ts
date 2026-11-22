@@ -6,7 +6,7 @@ import { actionSession } from "@/lib/session";
 const field = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 
 export async function claimMatricule(formData: FormData) {
-  const school = field(formData, "school_code").toLowerCase().slice(0, 60);
+  const school = field(formData, "school").toLowerCase().slice(0, 60);
   const matricule = field(formData, "matricule").toUpperCase().slice(0, 40);
   const fullName = field(formData, "full_name").slice(0, 200);
   if (!school || matricule.length < 2) redirect("/onboarding?error=invalid");
@@ -20,7 +20,7 @@ export async function claimMatricule(formData: FormData) {
 }
 
 export async function disputeMatricule(formData: FormData) {
-  const school = field(formData, "school_code").toLowerCase().slice(0, 60);
+  const school = field(formData, "school").toLowerCase().slice(0, 60);
   const matricule = field(formData, "matricule").toUpperCase().slice(0, 40);
   const { supabase } = await actionSession();
   const { error } = await supabase.rpc("dispute_matricule", { p_school: school, p_matricule: matricule });

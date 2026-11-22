@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseKey, supabaseUrl } from "@/lib/env";
 
-const PUBLIC_PATHS = ["/", "/login", "/auth", "/verify", "/app", "/api/demo-session", "/join", "/request-demo"];
+const PUBLIC_PATHS = ["/", "/login", "/auth", "/verify", "/app", "/api/demo-session", "/join", "/request-demo", "/demo"];
 
 /** Refreshes the Supabase session cookie and sends signed-out visitors to /login. */
 export async function updateSession(request: NextRequest) {
@@ -27,6 +27,13 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  // A confirmation email that came back to the home page instead of /auth/callback.
+  if (path === "/" && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth/callback";
+    return NextResponse.redirect(url);
+  }
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
 
   if (!user && !isPublic) {

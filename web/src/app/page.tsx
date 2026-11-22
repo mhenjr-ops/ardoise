@@ -37,7 +37,7 @@ export default async function Landing() {
   } = await supabase.auth.getUser();
   const L = t.landing;
   const fr = locale === "fr";
-  const demoHref = DEMO_ENABLED ? "/login#demo" : "/login";
+  const demoHref = DEMO_ENABLED ? "/demo" : "/login";
 
   const features = [
     { icon: BookOpen, label: L.f.modules },

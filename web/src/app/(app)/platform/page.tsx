@@ -159,7 +159,7 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-slate-900">{s.name}</p>
                     <p className="text-[13px] text-slate-500">
-                      {s.slug.toUpperCase()} · {s.default_locale.toUpperCase()} · {formatDate(locale, s.created_at)}
+                      /join/{s.slug} · {s.default_locale.toUpperCase()} · {formatDate(locale, s.created_at)}
                     </p>
                   </div>
                 </li>

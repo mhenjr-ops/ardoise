@@ -7,6 +7,8 @@ import { fmt } from "@/lib/i18n/messages-engage";
 import { formatDate } from "@/lib/format";
 import { Avatar, Badge, Button, Card, CardHeader, Empty, Flash, Input } from "@/components/ui";
 import { RosterImport } from "@/components/admin/roster-import";
+import { ShareLink } from "@/components/copy-button";
+import { siteOrigin } from "@/lib/site";
 import { importRoster, resolveClaim } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -84,9 +86,14 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
   return (
     <div className="space-y-6">
       <Flash error={errorText(t, typeof params.error === "string" ? params.error : null)} ok={params.ok ? t.common.saved : null} />
-      <p className="rounded-xl bg-paper px-4 py-3 text-[15px] text-slate-700 ring-1 ring-slate-200">
-        {fmt(t.roster.code, { code: institution.slug.toUpperCase() })}
-      </p>
+      <Card className="p-5">
+        <p className="mb-3 text-[15px] text-slate-700">{t.roster.code}</p>
+        <ShareLink
+          url={`${await siteOrigin()}/join/${institution.slug}`}
+          message={fmt(t.share.studentMessage, { institution: institution.name })}
+          labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
+        />
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
         <Card className="p-5">

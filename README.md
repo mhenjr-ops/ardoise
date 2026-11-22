@@ -9,7 +9,7 @@ ardoise-lms/
 ├── supabase/
 │   ├── migrations/   # run in filename order
 │   ├── seed/         # demo.sql, then demo-engage.sql, then demo-roles.sql
-│   └── tests/        # 269 security and behaviour checks on a real Postgres engine (PGlite)
+│   └── tests/        # 270 security and behaviour checks on a real Postgres engine (PGlite)
 ├── web/              # Next.js 16 web app (all roles); serves the phone preview at /app
 └── mobile/           # Expo SDK 58 phone app (students and teachers)
 ```
@@ -37,7 +37,7 @@ ardoise-lms/
 
 ## Roles and joining
 
-- **Schools are created by the Ardoise team only**, from the Ardoise console (`/platform`), usually after a request from `/request-demo`. Creating a school gives a one-time link for its owner.
+- **Schools are created by the Ardoise team only**, from the Ardoise console (`/platform`), usually after a request from `/request-demo`. Creating a school gives a one-time link for its owner. The sign-in page is the same for everyone (like Blackboard or Canvas, no school or role to choose); the one-tap demo accounts live on `/demo`.
 - **Seven roles**, each with its own home page:
 
 | Role | Can do |
@@ -50,8 +50,8 @@ ardoise-lms/
 | Teacher | Their own courses (any number of them; a course can have several teachers) |
 | Student | Their own courses and results |
 
-- **Staff join with an invitation link** (Admin → Staff): one use, 30 days, optionally tied to an email; copy it or send it on WhatsApp.
-- **Students join on their own**: they sign up with the school code, their matricule, name, email and password, then sign in with the matricule (or the email). The registrar imports the student list (Admin → Students, Excel or CSV straight from the registration portal, French or English column names). If a student signs up before the list is imported, their account links itself at the next import. If a matricule is already taken, the student reports it and the registrar decides after checking ID.
+- **Staff join with an invitation link** (Admin → Staff): one use, 30 days, optionally tied to an email; copy it or send it on WhatsApp. Someone who creates their account from the link is in the school as soon as they confirm their email.
+- **Students join on their own**, from their university's link (e.g. `/join/uba`, shared by the registrar from Admin → Students) or by picking their university from the list: matricule, name, email, password. After confirming their email they land in their courses, and from then on sign in with the matricule (or the email) on the one sign-in page; Ardoise knows their school and role. The registrar imports the student list (Admin → Students, Excel or CSV straight from the registration portal, French or English column names). If a student signs up before the list is imported, their account links itself at the next import. If a matricule is already taken, the student reports it and the registrar decides after checking ID.
 
 ## How results are computed
 
@@ -84,7 +84,7 @@ npm run dev                    # http://localhost:3000
 
 Deploy on Vercel with **Root Directory** `web` and the same environment variables. `DEMO_LOGINS=on` shows one-tap demo accounts; leave it off for real schools.
 
-Demo school code `ISDY`. Demo accounts (password `Ardoise2026!`): `admin@demo.ardoise.cm` (owner), `scolarite@demo.ardoise.cm` (registrar), `hod.info@demo.ardoise.cm` (head of Informatique), `j.mbarga@demo.ardoise.cm` (teacher, INF101), `brenda@demo.ardoise.cm` (student, also signs in as `ISDY26A001`), `cedric@demo.ardoise.cm`, `yannick@demo.ardoise.cm` (students). On the student list, `ISDY26A006` (NGONO Esther), `ISDY26A007` (TABI Marc) and `ISDY26A008` (BIH Ruth) haven't signed up yet.
+Demo school link `/join/isdy`; demo accounts on `/demo`. Demo accounts (password `Ardoise2026!`): `admin@demo.ardoise.cm` (owner), `scolarite@demo.ardoise.cm` (registrar), `hod.info@demo.ardoise.cm` (head of Informatique), `j.mbarga@demo.ardoise.cm` (teacher, INF101), `brenda@demo.ardoise.cm` (student, also signs in as `ISDY26A001`), `cedric@demo.ardoise.cm`, `yannick@demo.ardoise.cm` (students). On the student list, `ISDY26A006` (NGONO Esther), `ISDY26A007` (TABI Marc) and `ISDY26A008` (BIH Ruth) haven't signed up yet.
 
 **Things to try with the demo**
 - Teacher → INF101 → *TP 3 — Fonctions* → grade the three waiting hand-ins with the rubric.
@@ -92,7 +92,7 @@ Demo school code `ISDY`. Demo accounts (password `Ardoise2026!`): `admin@demo.ar
 - Admin → Deliberations → new: *Licence Informatique*, *S1 · 2026-2027*, level *L1* → lock → publish → PV → transcripts. Then as Cédric → Results → scan the transcript's QR code.
 - Brenda → INF101 → *Quiz 1 — Bases de Python*.
 - Sign in with matricule `ISDY26A001` instead of an email.
-- Create a student account with school code `ISDY`, matricule `ISDY26A006` and the name Esther Ngono: after the confirmation email it lands straight in her three courses.
+- Open `/join/isdy`, create a student account with matricule `ISDY26A006` and the name Esther Ngono: after the confirmation email it lands straight in her three courses.
 - Owner → Admin → Staff → invite a teacher for Informatique → open the link in another browser.
 - Head of department → a course → Grades: read-only, with export.
 
@@ -113,7 +113,7 @@ Store builds go through EAS (`npx eas-cli@latest build`), configured in `app.jso
 
 | Check | Result |
 | --- | --- |
-| `supabase/tests`: `npm install && npm test` (all migrations and the three seeds on PGlite) | 269 checks pass: school isolation, role powers and oversight, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
+| `supabase/tests`: `npm install && npm test` (all migrations and the three seeds on PGlite) | 270 checks pass: school isolation, role powers and oversight, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
 | `web`: `npm test` (LMD engine, student-list parser) | 24 tests pass |
 | `web`: `npx tsc --noEmit`, `npm run lint`, `npm run build` | clean |
 | `mobile`: `npx tsc --noEmit`, `npx expo lint`, `npx expo export` (Android and web) | clean |

@@ -19,6 +19,9 @@ check('the platform admin is not a member of the school', (await count('P', `sel
 check('the platform admin can list schools', (await count('P', `select count(*) n from public.institutions`)) >= 1);
 check('an outsider cannot see the school', (await count('Z', `select count(*) n from public.institutions where id = $1`, [inst])) === 0);
 
+const directory = (await as(null, `select * from public.school_directory()`, [], 'anon')).rows;
+check('anyone can list schools by name and link (nothing else)',
+  directory.some((s) => s.slug === 'ut' && s.name === 'Université Test') && Object.keys(directory[0]).join() === 'slug,name');
 const preview = (await as(null, `select public.invitation_preview($1) as p`, [ownerToken], 'anon')).rows[0].p;
 check('anyone with the link sees what it is for', preview.institution === 'Université Test' && preview.role === 'owner' && preview.status === 'open');
 check('the invited email is only hinted', preview.email_hint === 'o•••@demo.cm');
