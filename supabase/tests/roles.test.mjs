@@ -268,6 +268,22 @@ await expectError('an outsider cannot either', () => as('Z', `select public.teac
 await as('T2', `select public.leave_course($1)`, [his]);
 check('a lecturer can leave a course', (await count('R', `select count(*) n from public.enrollments where course_id = $1 and role = 'teacher'`, [his])) === 1);
 
+// --- The Ardoise team account is the master view, never a member of a school -------------
+await expectError('the Ardoise team account cannot join a school', async () => as('P', `select public.accept_invitation($1)`, [await invite('O', 'teacher')]), 'platform_account');
+await expectError('a school member cannot be made an Ardoise team account',
+  () => db.query('insert into public.platform_admins (user_id) values ($1)', [ids.O]), 'platform_account');
+const schools = (await as('P', `select * from public.platform_schools()`)).rows;
+const ut = schools.find((x) => x.slug === 'ut');
+check('the master dashboard sees every school with its numbers',
+  !!ut && ut.students_listed >= 4 && ut.students_joined >= 4 && ut.staff >= 5 && ut.courses >= 2 && ut.departments === 4 && ut.open_requests === 2);
+await expectError('a school owner cannot see the master numbers', () => as('O', `select * from public.platform_schools()`), 'forbidden');
+const office = (await as('P', `select * from public.platform_school_people($1)`, [inst])).rows;
+check('the master dashboard shows who runs a school', office[0]?.role === 'owner' && office.some((x) => x.role === 'registrar'));
+await expectError('nobody else can list them', () => as('AD', `select * from public.platform_school_people($1)`, [inst]), 'forbidden');
+const regs = (await as('T', `select * from public.course_registrations($1)`, [his])).rows;
+check('a lecturer sees the course\'s registered students with their matricule', regs.some((x) => x.matricule === s1Mat && x.user_id === ids.S1));
+await expectError('a student cannot list them', () => as('S1', `select * from public.course_registrations($1)`, [his]), 'forbidden');
+
 // --- Roles can be taken back, but never the last owner ------------------------------------
 const hodRow = (await one('D', `select id from public.memberships where user_id = $1 and role = 'hod'`, [ids.H])).id;
 await as('D', `select public.revoke_role($1)`, [hodRow]);

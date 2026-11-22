@@ -61,7 +61,8 @@ export const getSession = cache(async () => {
   ]);
   const { data: platform } = await supabase.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle();
 
-  const rows = (memberships ?? []) as MembershipRow[];
+  // The Ardoise team account is the master view of every university, never a member of one.
+  const rows = platform ? [] : ((memberships ?? []) as MembershipRow[]);
   // Sprint 1: one current institution (the first). A switcher comes later.
   const institution = rows.map((m) => one(m.institution)).find(Boolean) ?? null;
   const mine = rows.filter((m) => institution && one(m.institution)?.id === institution.id);
@@ -96,6 +97,7 @@ export const getSession = cache(async () => {
 /** Same as getSession, but sends users with no institution to onboarding. */
 export const requireInstitution = cache(async () => {
   const session = await getSession();
+  if (session.isPlatformAdmin) redirect("/platform");
   if (!session.institution) redirect("/onboarding");
   return { ...session, institution: session.institution };
 });

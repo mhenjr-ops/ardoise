@@ -6,7 +6,7 @@ const STUB = `
 create role anon nologin;
 create role authenticated nologin;
 create schema auth;
-create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb);
+create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb, last_sign_in_at timestamptz);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 grant usage on schema auth to authenticated, anon;
 grant execute on function auth.uid() to authenticated, anon;
@@ -72,11 +72,15 @@ export async function setup(userKeys) {
   // Schools are created by platform admins; tests borrow that role for a moment.
   async function createSchool(user, name, slug) {
     await db.query('insert into public.platform_admins (user_id) values ($1) on conflict do nothing', [ids[user]]);
+    let id;
     try {
-      return (await as(user, 'select public.create_institution($1, $2) as id', [name, slug])).rows[0].id;
+      id = (await as(user, 'select public.create_institution($1, $2) as id', [name, slug])).rows[0].id;
     } finally {
       await db.query('delete from public.platform_admins where user_id = $1', [ids[user]]);
     }
+    // In real life the owner joins with the link from the console; tests make them owner directly.
+    await db.query(`insert into public.memberships (institution_id, user_id, role) values ($1, $2, 'owner')`, [id, ids[user]]);
+    return id;
   }
   function done() {
     console.log(failures === 0 ? '\nALL CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);

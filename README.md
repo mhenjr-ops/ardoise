@@ -9,7 +9,7 @@ ardoise-lms/
 ├── supabase/
 │   ├── migrations/   # run in filename order
 │   ├── seed/         # demo.sql, demo-engage.sql, demo-roles.sql; uba.sql + uba-demo.sql (University of Bamenda)
-│   └── tests/        # 323 security and behaviour checks on a real Postgres engine (PGlite)
+│   └── tests/        # 331 security and behaviour checks on a real Postgres engine (PGlite)
 ├── web/              # Next.js 16 web app (all roles); serves the phone preview at /app
 └── mobile/           # Expo SDK 58 phone app (students and teachers)
 ```
@@ -37,6 +37,7 @@ ardoise-lms/
 
 ## Roles and joining
 
+- **The Ardoise team account is the master view**: its home is every university with its numbers (students on the list and signed up, staff, courses this semester, who was active this week, change requests); each university has its own page there (numbers, who runs it, structure, calendar, teaching units, requests). It is never a member of a university, and the database refuses to make it one.
 - **Schools are created by the Ardoise team only**, from the Ardoise console (`/platform`), usually after a request from `/request-demo`. Creating a school gives a one-time link for its owner. The sign-in page is the same for everyone (like Blackboard or Canvas, no school or role to choose); the one-tap demo accounts live on `/demo`.
 - **Seven roles**, each with its own home page:
 
@@ -52,6 +53,7 @@ ardoise-lms/
 
 - **The Ardoise team sets up each school's structure** (faculties, schools and institutes, departments, programmes including HND, academic years and semesters, teaching units) from the console, by pasting a list (`# faculty`, `## school`, `- department`, `-- programme`; WhatsApp lists work too) and editing in place. Schools see it read-only under Admin → Structure and send change requests from there; requests land in the console.
 - **Courses come from the registrar's file.** The student list import (Excel or CSV straight from the registration portal; a template is on Admin → Students) carries each student's course codes and titles for a semester: missing courses are created once (a code exists once per semester), and students are enrolled automatically, now or as soon as they sign up.
+- **Lecturers see their class list straight away**: everyone enrolled, with matricules, plus the students on the registrar's list who haven't created their account yet (they join on their own when they do).
 - **Lecturers add the courses they teach** ("Add a course I teach" on their dashboard): they search the semester's list and join a course in one click. Two lecturers on the same code share one course. The head of the course's department and its other lecturers are notified, and the head can remove anyone from it.
 - **Staff join with an invitation link** (Admin → Staff): one use, 30 days, optionally tied to an email; copy it or send it on WhatsApp. Someone who creates their account from the link is in the school as soon as they confirm their email.
 - **Students join on their own**, from their university's link (e.g. `/join/uba`, shared by the registrar from Admin → Students) or by picking their university from the list: matricule, name, email, password. After confirming their email they land in their courses, and from then on sign in with the matricule (or the email) on the one sign-in page; Ardoise knows their school and role. The registrar imports the student list (Admin → Students, Excel or CSV straight from the registration portal, French or English column names). If a student signs up before the list is imported, their account links itself at the next import. If a matricule is already taken, the student reports it and the registrar decides after checking ID.
@@ -70,7 +72,7 @@ The defaults (pass 10/20, compensation on, CC 30 / TP 20 / exam 50, jury bonus u
 
 1. Create a project at supabase.com.
 2. **SQL Editor**: run every file in `supabase/migrations/` in filename order (or `supabase link` then `supabase db push`).
-3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`, then `supabase/seed/demo-roles.sql`. For presentations, `supabase/seed/uba.sql` loads the University of Bamenda's faculties, schools, departments and programmes, and `supabase/seed/uba-demo.sql` adds a lecturer teaching in three departments and a student with a full load (with classmates, timetable and first week of work). It needs the password for those two accounts first, so it is never in the repository: `select set_config('ardoise.demo_password', '…', false);` then run the file.
+3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`, then `supabase/seed/demo-roles.sql`. For presentations, `supabase/seed/uba.sql` loads the University of Bamenda's faculties, schools, departments and programmes, and `supabase/seed/uba-demo.sql` adds the university's administrator, a lecturer teaching in three departments and a student with a full load (with classmates, timetable and first week of work). It needs the password for those three accounts first, so it is never in the repository: `select set_config('ardoise.demo_password', '…', false);` then run the file.
 4. Give the Ardoise team access to the console: sign up once on the web app, then in the SQL Editor run `insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';`
 5. **Authentication → URL Configuration**: Site URL = your web address (e.g. `https://ardoise-pi.vercel.app`); add `<site>/auth/callback` to Redirect URLs. Without this, sign-up and password emails point to localhost.
 6. **Authentication → Emails**: sign-up sends a confirmation email. The built-in sender is rate-limited; set up your own SMTP sender (Resend, Brevo…) before real students sign up.
@@ -116,7 +118,7 @@ Store builds go through EAS (`npx eas-cli@latest build`), configured in `app.jso
 
 | Check | Result |
 | --- | --- |
-| `supabase/tests`: `npm install && npm test` (all migrations and the seeds on PGlite) | 323 checks pass: school isolation, role powers and oversight, structure set up by the Ardoise team, change requests, courses from the registrar's file, lecturers adding their courses, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
+| `supabase/tests`: `npm install && npm test` (all migrations and the seeds on PGlite) | 331 checks pass: the master account, school isolation, role powers and oversight, structure set up by the Ardoise team, change requests, courses from the registrar's file, lecturers adding their courses, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
 | `web`: `npm test` (LMD engine, student-list and structure-list parsers, Excel template) | 31 tests pass |
 | `web`: `npx tsc --noEmit`, `npm run lint`, `npm run build` | clean |
 | `mobile`: `npx tsc --noEmit`, `npx expo lint`, `npx expo export` (Android and web) | clean |

@@ -35,23 +35,36 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   }
   const inboxBadge = typeof unreadInbox === "number" ? unreadInbox : 0;
 
-  const items: NavItem[] = [
-    { href: "/dashboard", label: t.nav.dashboard, icon: <LayoutDashboard size={19} aria-hidden /> },
-    { href: "/calendar", label: t.shell.calendar, icon: <CalendarDays size={19} aria-hidden /> },
-    { href: "/inbox", label: t.shell.inbox, icon: <Inbox size={19} aria-hidden />, badge: inboxBadge },
-  ];
-  if (roles.includes("student")) {
-    items.push({ href: "/results", label: t.nav.results, icon: <GraduationCap size={19} aria-hidden /> });
-  }
-  if (can.adminArea) {
-    items.push({ href: "/admin", label: t.nav.admin, icon: <Settings2 size={19} aria-hidden /> });
-  }
+  const items: NavItem[] = [];
+  let listLabel = t.dashboard.myCourses;
   if (isPlatformAdmin) {
-    items.push({ href: "/platform", label: t.nav2.platform, icon: <ShieldCheck size={19} aria-hidden /> });
+    // The master account: every university, nothing of any one school's own.
+    items.push({ href: "/platform", label: t.master.overview, icon: <ShieldCheck size={19} aria-hidden /> });
+    const { data: schools } = await supabase.from("institutions").select("id, name, slug").order("name");
+    courses = ((schools ?? []) as Array<{ id: string; name: string; slug: string }>).map((s) => ({
+      id: s.id,
+      code: s.slug.toUpperCase(),
+      title: s.name,
+      color: "#C9A227",
+      href: `/platform/${s.slug}`,
+    }));
+    listLabel = t.master.universities;
+  } else {
+    items.push(
+      { href: "/dashboard", label: t.nav.dashboard, icon: <LayoutDashboard size={19} aria-hidden /> },
+      { href: "/calendar", label: t.shell.calendar, icon: <CalendarDays size={19} aria-hidden /> },
+      { href: "/inbox", label: t.shell.inbox, icon: <Inbox size={19} aria-hidden />, badge: inboxBadge },
+    );
+    if (roles.includes("student")) {
+      items.push({ href: "/results", label: t.nav.results, icon: <GraduationCap size={19} aria-hidden /> });
+    }
+    if (can.adminArea) {
+      items.push({ href: "/admin", label: t.nav.admin, icon: <Settings2 size={19} aria-hidden /> });
+    }
   }
   const displayName = profile.full_name || profile.email;
   const topRole = (["owner", "admin", "registrar", "dean", "hod", "teacher", "student"] as const).find((r) => roles.includes(r));
-  const roleLabel = topRole ? t.roles[topRole] : isPlatformAdmin ? t.nav2.platform : "";
+  const roleLabel = isPlatformAdmin ? t.master.role : topRole ? t.roles[topRole] : "";
   const paletteLabels = {
     search: t.shell.search,
     placeholder: t.shell.searchPlaceholder,
@@ -73,13 +86,17 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         <div className="relative overflow-hidden border-b border-white/10 px-5 pb-5 pt-6">
           <div aria-hidden className="absolute inset-0 opacity-90" style={{ backgroundImage: NDOP_CHALK, backgroundSize: "72px 72px" }} />
           <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-transparent via-ardoise/40 to-ardoise" />
-          <Link href="/dashboard" className="relative block">
+          <Link href={isPlatformAdmin ? "/platform" : "/dashboard"} className="relative block">
             <Wordmark dark />
           </Link>
-          {institution ? <p className="relative mt-3 line-clamp-2 text-[13px] leading-snug text-chalk/65">{institution.name}</p> : null}
+          {institution ? (
+            <p className="relative mt-3 line-clamp-2 text-[13px] leading-snug text-chalk/65">{institution.name}</p>
+          ) : isPlatformAdmin ? (
+            <p className="relative mt-3 text-[13px] leading-snug text-chalk/65">{t.master.subtitle}</p>
+          ) : null}
         </div>
         <div className="flex min-h-0 flex-1 flex-col pt-4">
-          <SidebarNav items={items} courses={courses} coursesLabel={t.dashboard.myCourses} />
+          <SidebarNav items={items} courses={courses} coursesLabel={listLabel} />
         </div>
         <div className="flex items-center gap-3 border-t border-white/10 px-4 py-3">
           <Avatar name={displayName} size={36} className="ring-2 ring-white/15" />
@@ -111,9 +128,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
       {/* Phones: slim slate bar */}
       <header className="sticky top-0 z-20 flex items-center gap-2 bg-ardoise px-3 py-2 text-chalk md:hidden">
-        <Link href="/dashboard" className="flex min-w-0 items-center gap-2.5">
+        <Link href={isPlatformAdmin ? "/platform" : "/dashboard"} className="flex min-w-0 items-center gap-2.5">
           <LogoMark size={32} />
-          <span className="truncate text-[15px] font-semibold">{institution?.name ?? "Ardoise"}</span>
+          <span className="truncate text-[15px] font-semibold">{institution?.name ?? (isPlatformAdmin ? t.master.subtitle : "Ardoise")}</span>
         </Link>
         <div className="ml-auto flex items-center">
           <CommandPalette labels={paletteLabels} compact />

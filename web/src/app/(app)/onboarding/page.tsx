@@ -13,6 +13,7 @@ type Claim = { matricule: string; status: string; created_at: string; institutio
 
 export default async function OnboardingPage({ searchParams }: PageProps<"/onboarding">) {
   const [{ supabase, user, profile, institution, isPlatformAdmin }, { t, locale }] = await Promise.all([getSession(), getI18n()]);
+  if (isPlatformAdmin) redirect("/platform");
   if (institution) redirect("/dashboard");
   const params = await searchParams;
   const str = (k: string) => (typeof params[k] === "string" ? (params[k] as string) : "");

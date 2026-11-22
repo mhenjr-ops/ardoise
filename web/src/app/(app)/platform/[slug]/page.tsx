@@ -38,7 +38,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
   const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale").eq("slug", slug).maybeSingle();
   if (!school) notFound();
 
-  const [structure, { data: reqs }, origin] = await Promise.all([
+  const [structure, { data: reqs }, origin, { data: allStats }, { data: office }] = await Promise.all([
     loadStructure(supabase, school.id),
     supabase
       .from("support_requests")
@@ -48,7 +48,20 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
       .order("created_at", { ascending: false })
       .limit(30),
     siteOrigin(),
+    supabase.rpc("platform_schools"),
+    supabase.rpc("platform_school_people", { p_institution: school.id }),
   ]);
+  const st = ((allStats ?? []) as Array<Record<string, number | string>>).find((x) => x.id === school.id);
+  const stats = st
+    ? [
+        { label: t.master.students, value: st.students_joined, suffix: fmt(t.master.onList, { n: st.students_listed }) },
+        { label: t.master.staff, value: st.staff },
+        { label: t.master.courses, value: st.courses },
+        { label: t.master.departments, value: st.departments },
+        { label: t.master.active, value: st.active_week },
+      ]
+    : [];
+  const people = (office ?? []) as Array<{ role: string; full_name: string; email: string; scope: string | null; last_sign_in_at: string | null }>;
   const { units, departments, programmes, years, semesters, ues } = structure;
   const requests = (reqs ?? []) as SupportRequest[];
 
@@ -177,8 +190,21 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
         <ArrowLeft size={15} aria-hidden />
         {t.structure.backToConsole}
       </Link>
-      <PageHeader title={school.name} subtitle={t.platform.title} />
+      <PageHeader title={school.name} subtitle={`/join/${school.slug} · ${t.master.role}`} />
       <Flash error={error} ok={ok} />
+      {stats.length ? (
+        <dl className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {stats.map((x) => (
+            <div key={x.label} className="rounded-2xl border border-slate-200 bg-paper px-4 py-3">
+              <dt className="text-[12.5px] font-semibold text-slate-500">{x.label}</dt>
+              <dd className="num font-display text-[1.7rem] font-semibold leading-tight text-slate-900">
+                {x.value}
+                {"suffix" in x && x.suffix ? <span className="ml-1 text-[12.5px] font-normal text-slate-400">{x.suffix}</span> : null}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_380px]">
         <div id="structure" className="min-w-0 scroll-mt-6">
@@ -192,6 +218,31 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader title={t.master.office} />
+            {people.length ? (
+              <ul className="divide-y divide-slate-100">
+                {people.map((p, i) => (
+                  <li key={`${p.email}-${p.role}-${i}`} className="px-5 py-3">
+                    <p className="flex flex-wrap items-center gap-2 text-[14.5px] font-semibold text-slate-900">
+                      {p.full_name || p.email}
+                      <Badge tone={p.role === "owner" ? "brand" : "neutral"}>{t.roles[p.role as keyof typeof t.roles] ?? p.role}</Badge>
+                    </p>
+                    <p className="text-[13px] text-slate-500">
+                      <a href={`mailto:${p.email}`} className="hover:underline">
+                        {p.email}
+                      </a>
+                      {p.scope ? ` · ${p.scope}` : ""} ·{" "}
+                      {p.last_sign_in_at ? fmt(t.master.lastSeen, { date: formatDate(locale, p.last_sign_in_at) }) : t.master.never}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-5 py-4 text-[14px] text-slate-500">{t.master.noOffice}</p>
+            )}
+          </Card>
+
           <Card id="requests" className="scroll-mt-6">
             <CardHeader title={t.structure.changeRequests} />
             {requests.length ? (

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const KNOWN = ["invitation_invalid", "invitation_used", "invitation_expired", "invitation_wrong_email"];
+const KNOWN = ["invitation_invalid", "invitation_used", "invitation_expired", "invitation_wrong_email", "platform_account"];
 
 export async function acceptInvitation(formData: FormData) {
   const token = String(formData.get("token") ?? "").slice(0, 100);

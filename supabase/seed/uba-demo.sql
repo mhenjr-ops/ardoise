@@ -1,12 +1,13 @@
--- University of Bamenda presentation accounts: a lecturer who teaches in three
--- departments and a Level 200 student with a full first-semester load, with their
+-- University of Bamenda presentation accounts: the university's administrator, a lecturer
+-- who teaches in three departments and a Level 200 student with a full first-semester load, with their
 -- classmates, lecturers, timetable and first week of work.
 -- Run after uba.sql. Safe to run twice (does nothing the second time).
 --
--- The two accounts you sign in with share one password, given at run time so it is never
+-- The three accounts you sign in with share one password, given at run time so it is never
 -- in the repository:
 --   select set_config('ardoise.demo_password', 'your-password', false);
 -- Everyone else (classmates, other lecturers) gets a random password nobody knows.
+--   admin.uba@demo.ardoise.cm     Administrator, owner of UBa (the university's own view)
 --   p.nfor@demo.ardoise.cm        Dr Peter Nfor, lecturer (CSC201, CSC205, CEC203, ECO207)
 --   d.ngwa@demo.ardoise.cm        Ngwa Divine Achu, student, matricule UBA25S0217
 
@@ -28,6 +29,7 @@ declare
   pg uuid;
   asg uuid;
   people constant jsonb := $json$[
+    {"key": "admin", "email": "admin.uba@demo.ardoise.cm", "name": "Administrator", "role": "owner", "login": true},
     {"key": "nfor", "email": "p.nfor@demo.ardoise.cm", "name": "Dr Peter Nfor", "role": "teacher", "dept": "Mathematics and Computer Science", "login": true},
     {"key": "ndi", "email": "uba.e.ndi@demo.ardoise.cm", "name": "Prof. Emmanuel Ndi", "role": "teacher", "dept": "Mathematics and Computer Science"},
     {"key": "akum", "email": "uba.r.akum@demo.ardoise.cm", "name": "Dr Rita Akum", "role": "teacher", "dept": "Mathematics and Computer Science"},
@@ -116,7 +118,9 @@ begin
             'email', now(), now(), now());
     update public.profiles set full_name = u ->> 'name', locale = 'en' where id = uid;
     ids := ids || jsonb_build_object(u ->> 'key', uid);
-    if u ->> 'role' = 'teacher' then
+    if u ->> 'role' = 'owner' then
+      insert into public.memberships (institution_id, user_id, role) values (inst, uid, 'owner');
+    elsif u ->> 'role' = 'teacher' then
       select d.id into dep from public.departments d where d.institution_id = inst and d.name = u ->> 'dept' limit 1;
       insert into public.memberships (institution_id, user_id, role, department_id) values (inst, uid, 'teacher', dep);
     else

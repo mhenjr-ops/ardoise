@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-const INVITE_ERRORS = ["invitation_invalid", "invitation_used", "invitation_expired", "invitation_wrong_email"];
+const INVITE_ERRORS = ["invitation_invalid", "invitation_used", "invitation_expired", "invitation_wrong_email", "platform_account"];
 const TOKEN = /^[a-f0-9]{64}$/;
 
 /** A /join/... value is an invitation when it is a 64-character token; otherwise it names a school. */

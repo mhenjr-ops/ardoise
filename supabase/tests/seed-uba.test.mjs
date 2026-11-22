@@ -45,9 +45,10 @@ await db.exec(demo);
 const uid = async (email) => (await db.query('select id from auth.users where email = $1', [email])).rows[0]?.id;
 const divine = await uid('d.ngwa@demo.ardoise.cm');
 const nfor = await uid('p.nfor@demo.ardoise.cm');
-check('17 accounts: 5 lecturers and 12 students', (await n(`select count(*) n from auth.users`)) === 17);
-check('the two sign-in accounts share the given password, the rest do not',
-  (await n(`select count(*) n from auth.users where encrypted_password = '$2a$06$stub' || md5('Test-Pass-1234')`)) === 2);
+check('18 accounts: the administrator, 5 lecturers and 12 students', (await n(`select count(*) n from auth.users`)) === 18
+  && (await n(`select count(*) n from public.memberships where role = 'owner'`)) === 1);
+check('the three sign-in accounts share the given password, the rest do not',
+  (await n(`select count(*) n from auth.users where encrypted_password = '$2a$06$stub' || md5('Test-Pass-1234')`)) === 3);
 check('Divine has a full load: 7 courses', (await n(`select count(*) n from public.enrollments where user_id = '${divine}' and role = 'student'`)) === 7);
 check('Dr Nfor teaches 4 courses in 3 departments of 3 faculties and schools',
   (await n(`select count(*) n from public.enrollments where user_id = '${nfor}' and role = 'teacher'`)) === 4
@@ -62,5 +63,5 @@ check('a weekly timetable and the exam period', (await n(`select count(*) n from
   && (await n(`select count(*) n from public.calendar_events where kind = 'exam'`)) === 1);
 check('Divine has work due', (await n(`select count(*) n from public.assignments a join public.enrollments e on e.course_id = a.course_id where e.user_id = '${divine}' and a.due_at > now()`)) === 3);
 await db.exec(demo);
-check('running it again adds nothing', (await n(`select count(*) n from auth.users`)) === 17);
+check('running it again adds nothing', (await n(`select count(*) n from auth.users`)) === 18);
 done();

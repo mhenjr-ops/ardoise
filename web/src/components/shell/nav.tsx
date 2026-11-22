@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 export type NavItem = { href: string; label: string; icon: ReactNode; badge?: number };
-export type NavCourse = { id: string; code: string; title: string; color: string };
+export type NavCourse = { id: string; code: string; title: string; color: string; href?: string };
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -50,7 +50,7 @@ export function SidebarNav({ items, courses, coursesLabel }: { items: NavItem[];
           <p className="px-3 pb-2 text-[12.5px] font-semibold text-chalk/45">{coursesLabel}</p>
           <ul className="space-y-0.5">
             {courses.map((c) => {
-              const href = `/courses/${c.id}`;
+              const href = c.href ?? `/courses/${c.id}`;
               const active = isActive(pathname, href);
               return (
                 <li key={c.id}>

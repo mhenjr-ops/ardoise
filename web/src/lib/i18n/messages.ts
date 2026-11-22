@@ -346,6 +346,7 @@ const fr = {
   errors: {
     generic: "Une erreur est survenue. Réessayez.",
     in_use: "Encore utilisé : retirez d'abord ce qu'il contient.",
+    platform_account: "C'est le compte de l'équipe Ardoise : il ne peut pas rejoindre une université. Déconnectez-vous et utilisez le compte de la personne.",
     user_not_found: "Aucun compte avec cette adresse e-mail.",
     forbidden: "Vous n'avez pas l'autorisation.",
     slug_taken: "Cet identifiant est déjà utilisé.",
@@ -716,6 +717,7 @@ const en: CoreMessages = {
   errors: {
     generic: "Something went wrong. Try again.",
     in_use: "Still in use: remove what's inside it first.",
+    platform_account: "This is the Ardoise team account: it can't join a university. Sign out and use the person's own account.",
     user_not_found: "No account with that email address.",
     forbidden: "You don't have permission.",
     slug_taken: "That ID is already taken.",

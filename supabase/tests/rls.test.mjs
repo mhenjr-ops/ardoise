@@ -54,11 +54,14 @@ async function as(user, sql, params = []) {
 }
 async function createSchool(user, name, slug) {
   await db.query('insert into public.platform_admins (user_id) values ($1) on conflict do nothing', [ids[user]]);
+  let id;
   try {
-    return (await as(user, 'select public.create_institution($1, $2) as id', [name, slug])).rows[0].id;
+    id = (await as(user, 'select public.create_institution($1, $2) as id', [name, slug])).rows[0].id;
   } finally {
     await db.query('delete from public.platform_admins where user_id = $1', [ids[user]]);
   }
+  await db.query(`insert into public.memberships (institution_id, user_id, role) values ($1, $2, 'owner')`, [id, ids[user]]);
+  return id;
 }
 let failures = 0;
 function check(label, cond) {
