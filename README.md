@@ -8,8 +8,8 @@ A learning platform for Cameroonian universities, in the spirit of Canvas and Bl
 ardoise-lms/
 ├── supabase/
 │   ├── migrations/   # run in filename order
-│   ├── seed/         # demo.sql, then demo-engage.sql
-│   └── tests/        # 189 security and behaviour checks on a real Postgres engine (PGlite)
+│   ├── seed/         # demo.sql, then demo-engage.sql, then demo-roles.sql
+│   └── tests/        # 269 security and behaviour checks on a real Postgres engine (PGlite)
 ├── web/              # Next.js 16 web app (all roles); serves the phone preview at /app
 └── mobile/           # Expo SDK 58 phone app (students and teachers)
 ```
@@ -35,6 +35,24 @@ ardoise-lms/
 
 **Phone app**: home with stats and check-in, calendar, inbox, results, notifications, course modules, assignments with photo submission, quizzes, discussions, attendance (teachers run roll call), grading.
 
+## Roles and joining
+
+- **Schools are created by the Ardoise team only**, from the Ardoise console (`/platform`), usually after a request from `/request-demo`. Creating a school gives a one-time link for its owner.
+- **Seven roles**, each with its own home page:
+
+| Role | Can do |
+| --- | --- |
+| Owner | Everything in the school, including naming administrators and reopening a locked deliberation |
+| Administrator | School structure, courses, staff; reads every course |
+| Registrar | Student list, enrolments, grading rules, deliberations, transcripts; reads every course |
+| Dean | Reads the courses and results of their faculty; names heads of department and teachers there |
+| Head of department | Reads their department's courses (marks read-only), creates courses, assigns teachers |
+| Teacher | Their own courses (any number of them; a course can have several teachers) |
+| Student | Their own courses and results |
+
+- **Staff join with an invitation link** (Admin → Staff): one use, 30 days, optionally tied to an email; copy it or send it on WhatsApp.
+- **Students join on their own**: they sign up with the school code, their matricule, name, email and password, then sign in with the matricule (or the email). The registrar imports the student list (Admin → Students, Excel or CSV straight from the registration portal, French or English column names). If a student signs up before the list is imported, their account links itself at the next import. If a matricule is already taken, the student reports it and the registrar decides after checking ID.
+
 ## How results are computed
 
 - **Course mark** = mix of components (CC, TP, exam), each the weighted average of its assignments scaled to /20. A missing mark counts as 0 within a component; a student with no mark at all in a course is *absent*. Work with weight 0 (practice) doesn't count. A graded resit replaces the exam, or the better of the two is kept, per the school's rule.
@@ -49,9 +67,11 @@ The defaults (pass 10/20, compensation on, CC 30 / TP 20 / exam 50, jury bonus u
 
 1. Create a project at supabase.com.
 2. **SQL Editor**: run every file in `supabase/migrations/` in filename order (or `supabase link` then `supabase db push`).
-3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`.
-4. **Authentication → URL Configuration**: Site URL = your web address (e.g. `https://ardoise-pi.vercel.app`); add `<site>/auth/callback` to Redirect URLs. Without this, sign-up and password emails point to localhost.
-5. Copy the project URL and publishable (or anon) key from **Settings → API**.
+3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`, then `supabase/seed/demo-roles.sql`.
+4. Give the Ardoise team access to the console: sign up once on the web app, then in the SQL Editor run `insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';`
+5. **Authentication → URL Configuration**: Site URL = your web address (e.g. `https://ardoise-pi.vercel.app`); add `<site>/auth/callback` to Redirect URLs. Without this, sign-up and password emails point to localhost.
+6. **Authentication → Emails**: sign-up sends a confirmation email. The built-in sender is rate-limited; set up your own SMTP sender (Resend, Brevo…) before real students sign up.
+7. Copy the project URL and publishable (or anon) key from **Settings → API**.
 
 ## 2. Web app
 
@@ -64,13 +84,17 @@ npm run dev                    # http://localhost:3000
 
 Deploy on Vercel with **Root Directory** `web` and the same environment variables. `DEMO_LOGINS=on` shows one-tap demo accounts; leave it off for real schools.
 
-Demo accounts (password `Ardoise2026!`): `admin@demo.ardoise.cm` (admin + registrar), `j.mbarga@demo.ardoise.cm` (teacher, INF101), `brenda@demo.ardoise.cm`, `cedric@demo.ardoise.cm`, `yannick@demo.ardoise.cm` (students).
+Demo school code `ISDY`. Demo accounts (password `Ardoise2026!`): `admin@demo.ardoise.cm` (owner), `scolarite@demo.ardoise.cm` (registrar), `hod.info@demo.ardoise.cm` (head of Informatique), `j.mbarga@demo.ardoise.cm` (teacher, INF101), `brenda@demo.ardoise.cm` (student, also signs in as `ISDY26A001`), `cedric@demo.ardoise.cm`, `yannick@demo.ardoise.cm` (students). On the student list, `ISDY26A006` (NGONO Esther), `ISDY26A007` (TABI Marc) and `ISDY26A008` (BIH Ruth) haven't signed up yet.
 
 **Things to try with the demo**
 - Teacher → INF101 → *TP 3 — Fonctions* → grade the three waiting hand-ins with the rubric.
 - Teacher → INF101 → Attendance → start roll call; as Brenda, type the code on the phone app's home screen.
 - Admin → Deliberations → new: *Licence Informatique*, *S1 · 2026-2027*, level *L1* → lock → publish → PV → transcripts. Then as Cédric → Results → scan the transcript's QR code.
 - Brenda → INF101 → *Quiz 1 — Bases de Python*.
+- Sign in with matricule `ISDY26A001` instead of an email.
+- Create a student account with school code `ISDY`, matricule `ISDY26A006` and the name Esther Ngono: after the confirmation email it lands straight in her three courses.
+- Owner → Admin → Staff → invite a teacher for Informatique → open the link in another browser.
+- Head of department → a course → Grades: read-only, with export.
 
 ## 3. Phone app
 
@@ -89,11 +113,11 @@ Store builds go through EAS (`npx eas-cli@latest build`), configured in `app.jso
 
 | Check | Result |
 | --- | --- |
-| `supabase/tests`: `npm install && npm test` (all migrations and both seeds on PGlite) | 189 checks pass: school isolation, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
-| `web`: `npm test` (LMD engine) | 19 tests pass |
+| `supabase/tests`: `npm install && npm test` (all migrations and the three seeds on PGlite) | 269 checks pass: school isolation, role powers and oversight, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
+| `web`: `npm test` (LMD engine, student-list parser) | 24 tests pass |
 | `web`: `npx tsc --noEmit`, `npm run lint`, `npm run build` | clean |
 | `mobile`: `npx tsc --noEmit`, `npx expo lint`, `npx expo export` (Android and web) | clean |
-| Live demo (Supabase + Vercel) | web checked as admin, teacher and student; phone preview checked as student and teacher |
+| Live demo (Supabase + Vercel) | web checked as owner, registrar, head of department, teacher, student (email and matricule sign-in), Ardoise console and invitation links; phone preview checked as student and teacher |
 
 Not yet done: a run on a physical Android phone.
 
@@ -103,7 +127,9 @@ Not yet done: a run on a physical Android phone.
 - Notifications are in-app only; push, SMS and WhatsApp come next.
 - Multiple-choice questions are all-or-nothing; editing an answer key doesn't re-mark past attempts.
 - PDFs use the standard Latin-1 fonts: French accents work, other scripts are replaced.
-- Still to come: mobile-money billing, iOS build, offline course downloads.
+- The phone app doesn't know the new roles or matricule sign-in yet (paused while the web workflow settles).
+- Student-list import takes Excel/CSV; reading the registration portal's Form B directly comes next.
+- Still to come: Google sign-in, two-step sign-in, per-school branding, mobile-money billing, iOS build, offline course downloads.
 
 ## Decisions
 

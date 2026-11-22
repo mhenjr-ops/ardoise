@@ -34,13 +34,12 @@ type Invite = {
   full_name: string;
   token: string;
   expires_at: string;
+  created_by: string | null;
 };
 
 export default async function PeoplePage({ searchParams }: PageProps<"/admin/people">) {
-  const [{ supabase, institution, memberships: mine }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
+  const [{ supabase, institution, memberships: mine, user }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
   const params = await searchParams;
-  const token = typeof params.token === "string" ? params.token : "";
-  const newRole = (typeof params.role === "string" ? params.role : "teacher") as InstitutionRole;
 
   const [{ data: rows }, { data: invites }, { data: facs }, { data: deps }, origin] = await Promise.all([
     supabase
@@ -50,7 +49,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
       .neq("role", "student"),
     supabase
       .from("invitations")
-      .select("id, role, faculty_id, department_id, email, full_name, token, expires_at")
+      .select("id, role, faculty_id, department_id, email, full_name, token, expires_at, created_by")
       .eq("institution_id", institution.id)
       .is("accepted_at", null)
       .is("revoked_at", null)
@@ -85,19 +84,21 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
   }
   const rank = (e: { roles: Row[] }) => Math.min(...e.roles.map((r) => ROLE_ORDER.indexOf(r.role)));
   const list = [...people.values()].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, locale));
+  // Just created: the newest open link this user made.
+  const fresh = params.created ? ((invites ?? []) as Invite[]).find((v) => v.created_by === user.id) : undefined;
   const ownerCount = ((rows ?? []) as Row[]).filter((r) => r.role === "owner").length;
 
   return (
     <div className="space-y-6">
       <Flash error={errorText(t, typeof params.error === "string" ? params.error : null)} ok={params.ok ? t.common.saved : null} />
 
-      {token ? (
+      {fresh ? (
         <Card className="border-ochre-200 bg-ochre-50/60 p-5">
-          <p className="font-display text-lg font-semibold">{fmt(t.staffing.linkReady, { role: t.roles[newRole] ?? newRole })}</p>
+          <p className="font-display text-lg font-semibold">{fmt(t.staffing.linkReady, { role: t.roles[fresh.role] ?? fresh.role })}</p>
           <p className="mb-3 text-[14px] text-slate-600">{t.staffing.linkHelp}</p>
           <ShareLink
-            url={`${origin}/join/${token}`}
-            message={fmt(t.share.message, { institution: institution.name, role: t.roles[newRole] ?? newRole })}
+            url={`${origin}/join/${fresh.token}`}
+            message={fmt(t.share.message, { institution: institution.name, role: t.roles[fresh.role] ?? fresh.role })}
             labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
           />
         </Card>

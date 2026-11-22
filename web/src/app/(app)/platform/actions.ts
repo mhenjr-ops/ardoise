@@ -11,7 +11,7 @@ export async function createSchool(formData: FormData) {
   const slug = field(formData, "slug", 60).toLowerCase();
   if (name.length < 2 || !/^[a-z0-9-]{2,60}$/.test(slug)) redirect("/platform?error=invalid");
   const { supabase } = await actionSession();
-  const { data, error } = await supabase.rpc("create_school", {
+  const { error } = await supabase.rpc("create_school", {
     p_name: name,
     p_slug: slug,
     p_default_locale: formData.get("locale") === "fr" ? "fr" : "en",
@@ -20,7 +20,8 @@ export async function createSchool(formData: FormData) {
   });
   if (error) redirect(`/platform?error=${error.code === "23505" ? "slug_taken" : error.message.includes("forbidden") ? "forbidden" : "generic"}`);
   revalidatePath("/platform");
-  redirect(`/platform?token=${encodeURIComponent(String(data))}&school=${encodeURIComponent(name)}`);
+  // The new owner link shows under "Owner links not used yet"; tokens stay out of the address bar.
+  redirect("/platform");
 }
 
 export async function markRequestHandled(formData: FormData) {

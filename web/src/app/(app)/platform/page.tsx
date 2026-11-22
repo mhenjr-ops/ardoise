@@ -24,31 +24,51 @@ type Request = {
 
 /** The Ardoise team's console: demo requests and new schools. */
 export default async function PlatformPage({ searchParams }: PageProps<"/platform">) {
-  const [{ supabase, isPlatformAdmin }, { t, locale }] = await Promise.all([getSession(), getI18n()]);
+  const [{ supabase, isPlatformAdmin, user }, { t, locale }] = await Promise.all([getSession(), getI18n()]);
   if (!isPlatformAdmin) notFound();
   const params = await searchParams;
-  const token = typeof params.token === "string" ? params.token : "";
-  const newSchool = typeof params.school === "string" ? params.school : "";
 
-  const [{ data: requests }, { data: schools }, origin] = await Promise.all([
+  const [{ data: requests }, { data: schools }, { data: links }, origin] = await Promise.all([
     supabase.from("demo_requests").select("*").order("handled_at", { ascending: true, nullsFirst: true }).order("created_at", { ascending: false }).limit(100),
     supabase.from("institutions").select("id, name, slug, default_locale, created_at").order("created_at", { ascending: false }),
+    supabase
+      .from("invitations")
+      .select("id, token, institution_id")
+      .eq("role", "owner")
+      .eq("created_by", user.id)
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false }),
     siteOrigin(),
   ]);
+  const schoolName = new Map(((schools ?? []) as Array<{ id: string; name: string }>).map((s) => [s.id, s.name]));
+  const ownerLinks = ((links ?? []) as Array<{ id: string; token: string; institution_id: string }>).map((l) => ({
+    ...l,
+    name: schoolName.get(l.institution_id) ?? "",
+  }));
 
   return (
     <>
       <PageHeader title={t.platform.title} subtitle={t.platform.subtitle} />
       <Flash error={errorText(t, typeof params.error === "string" ? params.error : null)} />
 
-      {token ? (
+      {ownerLinks.length > 0 ? (
         <Card className="mb-6 border-ochre-200 bg-ochre-50/60 p-5">
-          <p className="mb-3 font-display text-lg font-semibold">{fmt(t.platform.ownerLink, { institution: newSchool })}</p>
-          <ShareLink
-            url={`${origin}/join/${token}`}
-            message={fmt(t.share.message, { institution: newSchool, role: t.roles.owner })}
-            labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
-          />
+          <p className="font-display text-lg font-semibold">{t.platform.ownerLinks}</p>
+          <p className="mb-4 text-[14px] text-slate-600">{t.platform.ownerLinksHelp}</p>
+          <ul className="space-y-4">
+            {ownerLinks.map((l) => (
+              <li key={l.id}>
+                <p className="mb-2 text-[14px] font-semibold text-slate-800">{fmt(t.platform.ownerLink, { institution: l.name })}</p>
+                <ShareLink
+                  url={`${origin}/join/${l.token}`}
+                  message={fmt(t.share.message, { institution: l.name, role: t.roles.owner })}
+                  labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
+                />
+              </li>
+            ))}
+          </ul>
         </Card>
       ) : null}
 

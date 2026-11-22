@@ -11,7 +11,7 @@ const code = (message: string) =>
 export async function createInvitation(formData: FormData) {
   const role = field(formData, "role", 20);
   const { supabase } = await actionSession();
-  const { data, error } = await supabase.rpc("create_invitation", {
+  const { error } = await supabase.rpc("create_invitation", {
     p_institution: field(formData, "institution_id", 40),
     p_role: role,
     p_email: field(formData, "email", 320) || null,
@@ -21,7 +21,8 @@ export async function createInvitation(formData: FormData) {
   });
   if (error) redirect(`/admin/people?error=${code(error.message)}`);
   revalidatePath("/admin/people");
-  redirect(`/admin/people?token=${encodeURIComponent(String(data))}&role=${role}`);
+  // The page shows the newest link this user created; the token never goes in the address bar.
+  redirect("/admin/people?created=1");
 }
 
 export async function revokeInvitation(formData: FormData) {
