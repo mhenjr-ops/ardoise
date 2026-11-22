@@ -3,7 +3,7 @@
 import { setup } from './harness.mjs';
 
 const { db, ids, as, check, expectError, done } = await setup([
-  'P', 'O', 'AD', 'R', 'D', 'H', 'H2', 'T', 'T2', 'S1', 'S2', 'S3', 'S4', 'Z',
+  'P', 'O', 'AD', 'R', 'D', 'H', 'H2', 'T', 'T2', 'S1', 'S2', 'S3', 'S4', 'Z', 'Q1', 'Q2',
 ]);
 const one = async (user, sql, params) => (await as(user, sql, params)).rows[0];
 const count = async (user, sql, params) => Number((await as(user, sql, params)).rows[0].n);
@@ -330,5 +330,51 @@ await expectError('an assistant cannot remove the owner', () => as('Z', `select 
 await as('P', `select public.remove_teammate($1)`, [ids.Z]);
 check('the owner removes an assistant', (await count('P', `select count(*) n from public.platform_team()`)) === 1);
 await expectError('a removed assistant sees nothing', () => as('Z', `select * from public.platform_schools()`), 'forbidden');
+
+// --- The team's hierarchy -----------------------------------------------------------------
+const tokQ1 = (await one('P', `select public.create_team_invitation('', 'Leticia', 'Operations') as t`)).t;
+const pendingQ1 = await one('P', `select title, reports_to from public.platform_invitations where token = $1`, [tokQ1]);
+check('someone invited already has their place: a title, under the owner', pendingQ1.title === 'Operations' && pendingQ1.reports_to === ids.P);
+await as('Q1', `select public.accept_team_invitation($1)`, [tokQ1]);
+const q1 = await one('P', `select title, reports_to from public.platform_team() where user_id = $1`, [ids.Q1]);
+check('joining keeps the title and the manager', q1.title === 'Operations' && q1.reports_to === ids.P);
+const tokQ2 = (await one('P', `select public.create_team_invitation('', 'Sales rep', 'Sales', $1) as t`, [ids.Q1])).t;
+await as('Q2', `select public.accept_team_invitation($1)`, [tokQ2]);
+check('the owner can place a new teammate under someone else',
+  (await one('P', `select reports_to from public.platform_team() where user_id = $1`, [ids.Q2])).reports_to === ids.Q1);
+await expectError('nobody reports to someone below them', () => as('P', `select public.update_teammate($1, 'Ops', $2)`, [ids.Q1, ids.Q2]), 'invalid');
+await expectError('nobody reports to someone outside the team', () => as('P', `select public.update_teammate($1, 'Ops', $2)`, [ids.Q1, ids.Z]), 'invalid');
+await expectError('only the owner arranges the team', () => as('Q1', `select public.update_teammate($1, 'Boss', $2)`, [ids.Q2, ids.P]), 'forbidden');
+await as('P', `select public.update_teammate($1, 'Founder', $2)`, [ids.P, ids.Q1]);
+const me = await one('P', `select title, reports_to from public.platform_team() where user_id = $1`, [ids.P]);
+check('the owner gets a title and reports to no one', me.title === 'Founder' && me.reports_to === null);
+
+// --- Messages between teammates -------------------------------------------------------------
+await as('P', `select public.team_send(null, 'Welcome to the team!')`);
+await as('Q1', `select public.team_send($1, 'Can you call UBa tomorrow?')`, [ids.Q2]);
+check('everyone on the team reads the team conversation',
+  (await count('Q2', `select count(*) n from public.team_messages m join public.team_threads t on t.id = m.thread_id where t.key = 'team'`)) === 1);
+check('a one-to-one conversation is read by its two people', (await count('Q2', `select count(*) n from public.team_messages`)) === 2);
+check('…and by nobody else, not even the owner', (await count('P', `select count(*) n from public.team_messages`)) === 1);
+const q2inbox = (await as('Q2', `select * from public.team_inbox()`)).rows;
+check('each conversation shows who it is with and what is unread',
+  q2inbox.length === 2 && q2inbox.find((r) => r.peer === ids.Q1)?.unread === 1 && q2inbox.find((r) => r.peer === null)?.unread === 1);
+check('the sidebar badge counts conversations with something new', (await one('Q2', `select public.team_unread_count() as n`)).n === 2);
+check('your own message is not unread for you',
+  (await as('Q1', `select * from public.team_inbox()`)).rows.find((r) => r.peer === ids.Q2)?.unread === 0);
+await as('Q2', `select public.team_mark_read($1)`, [ids.Q1]);
+check('opening a conversation marks it read', (await one('Q2', `select public.team_unread_count() as n`)).n === 1);
+await expectError('people outside the team cannot write to it', () => as('Z', `select public.team_send(null, 'hi')`), 'forbidden');
+await expectError('…nor to a teammate', () => as('O', `select public.team_send($1, 'hi')`, [ids.P]), 'forbidden');
+await expectError('a teammate cannot write to an outsider', () => as('Q1', `select public.team_send($1, 'hi')`, [ids.Z]), 'forbidden');
+await expectError('an empty message is refused', () => as('Q1', `select public.team_send(null, '   ')`), 'invalid');
+check('outsiders read nothing', (await count('Z', `select count(*) n from public.team_messages`)) === 0);
+await expectError('messages only go through team_send',
+  () => as('Q1', `insert into public.team_messages (thread_id, body) select id, 'x' from public.team_threads limit 1`), 'permission denied');
+
+await as('P', `select public.remove_teammate($1)`, [ids.Q1]);
+check('removing a manager moves their people up a level',
+  (await one('P', `select reports_to from public.platform_team() where user_id = $1`, [ids.Q2])).reports_to === ids.P);
+check('a removed teammate reads no team messages', (await count('Q1', `select count(*) n from public.team_messages`)) === 0);
 
 done();

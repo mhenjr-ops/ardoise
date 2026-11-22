@@ -1,5 +1,16 @@
 import Link from "next/link";
-import { CalendarDays, GraduationCap, Inbox, LayoutDashboard, LogOut, MessageSquareText, Settings2, ShieldCheck, UsersRound } from "lucide-react";
+import {
+  CalendarDays,
+  GraduationCap,
+  Inbox,
+  LayoutDashboard,
+  LogOut,
+  MessageSquareText,
+  MessagesSquare,
+  Settings2,
+  ShieldCheck,
+  UsersRound,
+} from "lucide-react";
 import { getSession } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
 import { NDOP_CHALK } from "@/lib/ndop";
@@ -36,9 +47,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   let listLabel = t.dashboard.myCourses;
   if (isPlatformAdmin) {
     // The master account: every university, nothing of any one school's own.
-    const [{ count: openChanges }, { count: openDemos }] = await Promise.all([
+    const [{ count: openChanges }, { count: openDemos }, { data: unreadTeam }] = await Promise.all([
       supabase.from("support_requests").select("id", { count: "exact", head: true }).is("handled_at", null),
       supabase.from("demo_requests").select("id", { count: "exact", head: true }).is("handled_at", null),
+      supabase.rpc("team_unread_count"),
     ]);
     items.push(
       { href: "/platform", label: t.master.overview, icon: <ShieldCheck size={19} aria-hidden />, exact: true },
@@ -47,6 +59,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         label: t.master.requests,
         icon: <MessageSquareText size={19} aria-hidden />,
         badge: (openChanges ?? 0) + (openDemos ?? 0),
+      },
+      {
+        href: "/platform/messages",
+        label: t.master.messages,
+        icon: <MessagesSquare size={19} aria-hidden />,
+        badge: (unreadTeam as number | null) ?? 0,
       },
       { href: "/platform/team", label: t.master.team, icon: <UsersRound size={19} aria-hidden /> },
     );

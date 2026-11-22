@@ -9,7 +9,8 @@ import { formatTime } from "@/lib/calendar";
 import { Avatar, Badge, Button, Card, Flash, Select, cx } from "@/components/ui";
 import type { AttendanceRecord, AttendanceStatus } from "@/lib/types";
 import { closeCode, deleteSession, openCode, saveRoll } from "../actions";
-import { LiveRefresh, MarkAllPresent } from "../live-refresh";
+import { LiveRefresh } from "@/components/live-refresh";
+import { MarkAllPresent } from "../live-refresh";
 
 const STATUSES: AttendanceStatus[] = ["present", "late", "absent", "excused"];
 const active: Record<AttendanceStatus, string> = {

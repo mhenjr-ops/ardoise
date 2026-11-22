@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { actionSession } from "@/lib/session";
+import { errorCode } from "@/lib/errors";
 
 const field = (fd: FormData, k: string, max: number) => String(fd.get(k) ?? "").trim().slice(0, max);
 
@@ -36,15 +37,62 @@ export async function markRequestHandled(formData: FormData) {
 
 const TEAM = "/platform/team";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const person = (formData: FormData, key: string) => {
+  const v = field(formData, key, 40);
+  return UUID.test(v) ? v : null;
+};
+
 export async function createTeamInvite(formData: FormData) {
   const name = field(formData, "full_name", 200);
   const email = field(formData, "email", 320);
   if (name.length < 2) redirect(`${TEAM}?error=invalid`);
   const { supabase } = await actionSession();
-  const { error } = await supabase.rpc("create_team_invitation", { p_email: email, p_full_name: name });
+  const { error } = await supabase.rpc("create_team_invitation", {
+    p_email: email,
+    p_full_name: name,
+    p_title: field(formData, "title", 80),
+    p_reports_to: person(formData, "reports_to"),
+  });
   if (error) redirect(`${TEAM}?error=${error.message.includes("forbidden") ? "forbidden" : "invalid"}`);
   revalidatePath(TEAM);
   redirect(`${TEAM}?created=1`);
+}
+
+/** The owner changes what someone does and whom they report to. */
+export async function updateTeammate(formData: FormData) {
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("update_teammate", {
+    p_user: field(formData, "user_id", 40),
+    p_title: field(formData, "title", 80),
+    p_reports_to: person(formData, "reports_to"),
+  });
+  revalidatePath(TEAM);
+  redirect(error ? `${TEAM}?error=${error.message.includes("forbidden") ? "forbidden" : "invalid"}` : `${TEAM}?ok=1`);
+}
+
+export async function updateTeamInvite(formData: FormData) {
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("update_team_invitation", {
+    p_invitation: field(formData, "id", 40),
+    p_title: field(formData, "title", 80),
+    p_reports_to: person(formData, "reports_to"),
+  });
+  revalidatePath(TEAM);
+  redirect(error ? `${TEAM}?error=${error.message.includes("forbidden") ? "forbidden" : "invalid"}` : `${TEAM}?ok=1`);
+}
+
+/** A message to the whole team (no peer) or to one teammate. */
+export async function sendTeamMessage(formData: FormData) {
+  const peer = person(formData, "peer");
+  const back = `/platform/messages?with=${peer ?? "team"}`;
+  const body = String(formData.get("body") ?? "").trim().slice(0, 4000);
+  if (!body) redirect(back as "/platform/messages");
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("team_send", { p_peer: peer, p_body: body });
+  if (error) redirect(`${back}&error=${errorCode(error)}` as "/platform/messages");
+  revalidatePath("/platform", "layout");
+  redirect(back as "/platform/messages");
 }
 
 export async function revokeTeamInvite(formData: FormData) {
