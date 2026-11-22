@@ -175,7 +175,8 @@ export type NotificationKind =
   | "message"
   | "discussion"
   | "results"
-  | "attendance";
+  | "attendance"
+  | "teaching";
 
 export type AppNotification = {
   id: number;

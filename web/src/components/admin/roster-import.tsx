@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { FileSpreadsheet, Upload } from "lucide-react";
-import { parseCsv, rowsFromTable, type ColumnKey, type Columns, type RosterRow } from "@/lib/roster";
+import { parseCsv, rowsFromTable, type ColumnKey, type Columns, type CourseInfo, type RosterRow } from "@/lib/roster";
 import type { ImportResult } from "@/app/(app)/admin/students/actions";
 
 type Labels = {
@@ -16,6 +16,9 @@ type Labels = {
   importing: string;
   result: string;
   unknownCourses: string;
+  coursesCreated: string;
+  semester: string;
+  previewCourses: string;
   columnNames: Record<ColumnKey, string>;
   error: string;
 };
@@ -27,16 +30,21 @@ export function RosterImport({
   institutionId,
   action,
   labels,
+  semesters,
+  currentSemester,
 }: {
   institutionId: string;
-  action: (institutionId: string, rows: RosterRow[]) => Promise<ImportResult | { error: string }>;
+  action: (institutionId: string, rows: RosterRow[], semesterId: string | null, courses: CourseInfo[]) => Promise<ImportResult | { error: string }>;
   labels: Labels;
+  semesters: Array<{ id: string; label: string }>;
+  currentSemester: string | null;
 }) {
+  const [semester, setSemester] = useState(currentSemester ?? semesters[0]?.id ?? "");
   const [state, setState] = useState<
     | { kind: "idle" }
     | { kind: "reading" }
     | { kind: "error"; message: string }
-    | { kind: "ready"; file: string; rows: RosterRow[]; columns: Columns; registrations: number }
+    | { kind: "ready"; file: string; rows: RosterRow[]; columns: Columns; registrations: number; courses: CourseInfo[] }
     | { kind: "done"; result: ImportResult }
   >({ kind: "idle" });
   const [pending, start] = useTransition();
@@ -56,7 +64,14 @@ export function RosterImport({
         setState({ kind: "error", message: labels.noMatricule });
         return;
       }
-      setState({ kind: "ready", file: file.name, rows: parsed.rows, columns: parsed.columns, registrations: parsed.registrations });
+      setState({
+        kind: "ready",
+        file: file.name,
+        rows: parsed.rows,
+        columns: parsed.columns,
+        registrations: parsed.registrations,
+        courses: parsed.courses,
+      });
     } catch {
       setState({ kind: "error", message: labels.badFile });
     }
@@ -92,6 +107,25 @@ export function RosterImport({
             {labels.detected} :{" "}
             {(Object.keys(state.columns) as ColumnKey[]).map((k) => labels.columnNames[k]).join(" · ")}
           </p>
+          {state.courses.length ? (
+            <p className="text-[13.5px] text-slate-600">{fill(labels.previewCourses, { n: state.courses.length })}</p>
+          ) : null}
+          {semesters.length ? (
+            <label className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-slate-700">
+              {labels.semester}
+              <select
+                value={semester}
+                onChange={(e) => setSemester(e.target.value)}
+                className="h-10 rounded-[10px] border border-slate-300 bg-white px-3 text-[14px] font-normal"
+              >
+                {semesters.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13.5px]">
               <tbody>
@@ -111,7 +145,7 @@ export function RosterImport({
             disabled={pending}
             onClick={() =>
               start(async () => {
-                const res = await action(institutionId, state.rows);
+                const res = await action(institutionId, state.rows, semester || null, state.courses);
                 if ("error" in res) setState({ kind: "error", message: labels.error });
                 else setState({ kind: "done", result: res });
               })
@@ -135,6 +169,7 @@ export function RosterImport({
               linked: state.result.claims_linked,
             })}
           </p>
+          {state.result.courses_created ? <p>{fill(labels.coursesCreated, { n: state.result.courses_created })}</p> : null}
           {state.result.unknown_courses.length ? (
             <p className="text-ochre-800">{fill(labels.unknownCourses, { codes: state.result.unknown_courses.join(", ") })}</p>
           ) : null}

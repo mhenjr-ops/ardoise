@@ -12,8 +12,7 @@ import {
   Inbox,
   Megaphone,
   MessagesSquare,
-  NotebookPen,
-} from "lucide-react";
+  NotebookPen, UserPlus } from "lucide-react";
 import type { Locale, Messages } from "@/lib/i18n/messages";
 import { notificationText, timeAgo } from "@/lib/notifications";
 import type { AppNotification, NotificationKind } from "@/lib/types";
@@ -27,6 +26,7 @@ const kindIcon: Record<NotificationKind, typeof Bell> = {
   discussion: MessagesSquare,
   results: GraduationCap,
   attendance: CalendarCheck2,
+  teaching: UserPlus,
 };
 
 type Labels = { title: string; markAllRead: string; seeAll: string; empty: string };

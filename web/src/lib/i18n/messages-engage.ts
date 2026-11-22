@@ -107,6 +107,7 @@ export const frEngage = {
     discussion: "{course} · {author} a répondu dans « {title} »",
     results: "Résultats publiés : {programme}, {semester}",
     attendance: "{course} · Appel enregistré",
+    teaching: "{course} · {teacher} enseigne maintenant ce cours",
   },
   calendar: {
     title: "Agenda",
@@ -385,6 +386,7 @@ export const enEngage: EngageMessages = {
     discussion: "{course} · {author} replied in “{title}”",
     results: "Results published: {programme}, {semester}",
     attendance: "{course} · Attendance recorded",
+    teaching: "{course} · {teacher} now teaches this course",
   },
   calendar: {
     title: "Calendar",

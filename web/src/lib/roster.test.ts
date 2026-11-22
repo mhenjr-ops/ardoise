@@ -42,4 +42,33 @@ describe("student list import", () => {
       ["UBA1", "Fon; Brenda", "INF101, MAT102"],
     ]);
   });
+
+  it("reads course titles from a registration export (one row per student and course)", () => {
+    const table = [
+      ["Matricule", "Name", "Course Code", "Course Title", "Credits"],
+      ["UBa25S0217", "NGWA Divine", "CSC 201", "Data Structures and Algorithms", 6],
+      ["UBa25S0217", "NGWA Divine", "MAT 201", "Linear Algebra I", 5],
+      ["UBa25S0218", "TANYI Grace", "CSC 201", "Data Structures and Algorithms", 6],
+    ];
+    const r = rowsFromTable(table);
+    expect(r.rows.map((x) => x.courses)).toEqual([["CSC201", "MAT201"], ["CSC201"]]);
+    expect(r.courses).toEqual([
+      { code: "CSC201", title: "Data Structures and Algorithms" },
+      { code: "MAT201", title: "Linear Algebra I" },
+    ]);
+  });
+});
+
+
+describe("the downloadable Excel template", () => {
+  it("is read back as students and courses", async () => {
+    const { readSheet } = await import("read-excel-file/node");
+    const table = await readSheet("public/templates/ardoise-student-list.xlsx");
+    const r = rowsFromTable(table as Parameters<typeof rowsFromTable>[0]);
+    expect(r.rows.map((x) => [x.matricule, x.courses])).toEqual([
+      ["UBA25S0217", ["CSC201", "MAT201"]],
+      ["UBA25S0218", ["CSC201", "MAT201"]],
+    ]);
+    expect(r.courses.map((c) => c.title)).toEqual(["Data Structures and Algorithms", "Linear Algebra I"]);
+  });
 });

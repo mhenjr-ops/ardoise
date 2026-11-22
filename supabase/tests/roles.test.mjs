@@ -233,6 +233,41 @@ await as('O', `update public.deliberations set status = 'draft' where id = $1`, 
 check('the owner can reopen it', (await one('O', `select status from public.deliberations where id = $1`, [delib])).status === 'draft');
 check('the dean can read deliberations', (await count('D', `select count(*) n from public.deliberations where id = $1`, [delib])) === 1);
 
+// --- The course list comes from the registrar's file; lecturers add what they teach -------
+const coursesBefore = await count('R', `select count(*) n from public.courses where institution_id = $1`, [inst]);
+const s1Mat = (await one('S1', `select matricule from public.student_roster where claimed_by = $1`, [ids.S1])).matricule;
+const imp3 = (await one('R', `select public.import_roster($1, $2::jsonb, $3, $4::jsonb) as r`, [inst,
+  JSON.stringify([{ matricule: s1Mat, courses: ['HIS 201', 'INF202'] }]), sem,
+  JSON.stringify([{ code: 'his201', title: 'Histoire du Cameroun', department: 'Histoire' }, { code: 'INF202', title: 'Bases de données' }, { code: 'X1', title: '' }])])).r;
+check('courses named in the file are created, in that semester', imp3.courses_created === 2
+  && (await count('R', `select count(*) n from public.courses where institution_id = $1`, [inst])) === coursesBefore + 2
+  && (await count('R', `select count(*) n from public.courses where code = 'HIS201' and semester_id = $1`, [sem])) === 1);
+check('the file\'s department is kept', (await count('R', `select count(*) n from public.courses where code = 'HIS201' and department_id = $1`, [hist])) === 1);
+check('a registered student lands in them straight away',
+  (await count('S1', `select count(*) n from public.enrollments e join public.courses c on c.id = e.course_id where e.user_id = $1 and c.code in ('HIS201', 'INF202')`, [ids.S1])) === 2);
+const imp4 = (await one('R', `select public.import_roster($1, '[]'::jsonb, $2, $3::jsonb) as r`, [inst, sem,
+  JSON.stringify([{ code: 'HIS201', title: 'Histoire du Cameroun' }])])).r;
+check('importing again creates no duplicate course', imp4.courses_created === 0);
+check('course codes are written one way ("HIS 201" is HIS201)', (await count('R', `select count(*) n from public.courses where code = 'HIS201'`)) === 1);
+await expectError('a course code exists once per semester',
+  () => as('AD', `insert into public.courses (institution_id, code, title, semester_id) values ($1, 'his201', 'Copy', $2)`, [inst, sem]), 'duplicate key');
+const his = (await one('R', `select id from public.courses where code = 'HIS201'`)).id;
+check('lecturers see the semester\'s courses and can search them', (await count('T2', `select count(*) n from public.course_catalogue('cameroun')`)) === 1
+  && (await count('T2', `select count(*) n from public.course_catalogue('')`)) >= 3);
+check('students do not', (await count('S1', `select count(*) n from public.course_catalogue('')`)) === 0);
+await as('T2', `select public.teach_course($1)`, [his]);
+await as('T', `select public.teach_course($1)`, [his]);
+await as('T', `select public.teach_course($1)`, [his]);
+check('two lecturers, one course', (await count('R', `select count(*) n from public.enrollments where course_id = $1 and role = 'teacher'`, [his])) === 2
+  && (await count('R', `select count(*) n from public.courses where code = 'HIS201'`)) === 1);
+check('the course shows on their dashboard', (await count('T', `select count(*) n from public.courses where id = $1`, [his])) === 1);
+check('the head of the department is told who joined', (await count('H2', `select count(*) n from public.notifications where kind = 'teaching' and course_id = $1`, [his])) === 2);
+check('the other lecturer is told too', (await count('T2', `select count(*) n from public.notifications where kind = 'teaching' and course_id = $1`, [his])) === 1);
+await expectError('a student cannot make themselves the lecturer', () => as('S1', `select public.teach_course($1)`, [his]), 'forbidden');
+await expectError('an outsider cannot either', () => as('Z', `select public.teach_course($1)`, [his]), 'forbidden');
+await as('T2', `select public.leave_course($1)`, [his]);
+check('a lecturer can leave a course', (await count('R', `select count(*) n from public.enrollments where course_id = $1 and role = 'teacher'`, [his])) === 1);
+
 // --- Roles can be taken back, but never the last owner ------------------------------------
 const hodRow = (await one('D', `select id from public.memberships where user_id = $1 and role = 'hod'`, [ids.H])).id;
 await as('D', `select public.revoke_role($1)`, [hodRow]);

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { CalendarClock, ClipboardCheck, MapPin } from "lucide-react";
+import { CalendarClock, ClipboardCheck, MapPin, Plus } from "lucide-react";
 import { requireInstitution } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/messages-engage";
@@ -121,6 +121,8 @@ export default async function DashboardPage() {
   const totalToGrade = [...toGrade.values()].reduce((s, n) => s + n, 0);
 
   // School-wide figures for the office (owner, admin, registrar) when they don't teach.
+  // Lecturers (and heads who teach) get a way to add the courses they teach.
+  const teaches = memberships.some((m) => m.role === "teacher" || m.role === "hod" || m.role === "dean");
   const office = can.manageStudents && staffIds.length === 0 && studentIds.length === 0;
   let officeStats: { linked: number; total: number; staff: number; courses: number; claims: number } | null = null;
   if (office) {
@@ -227,9 +229,30 @@ export default async function DashboardPage() {
 
       <div className="grid gap-8 xl:grid-cols-[1fr_360px]">
         <section>
-          {cards.length || !can.isStaff ? <h2 className="mb-4 font-display text-2xl font-semibold">{t.dash.coursesTitle}</h2> : null}
+          {cards.length || !can.isStaff || teaches ? (
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+              <h2 className="font-display text-2xl font-semibold">{t.dash.coursesTitle}</h2>
+              {can.isStaff ? (
+                <Link href="/courses/add" className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-brand-600 hover:underline">
+                  <Plus size={15} aria-hidden />
+                  {t.teach.add}
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
           {cards.length === 0 ? (
-            can.isStaff ? null : <Empty>{t.dashboard.noCourses}</Empty>
+            can.isStaff ? (
+              teaches ? (
+                <Empty>
+                  {t.teach.empty}{" "}
+                  <Link href="/courses/add" className="font-semibold text-brand-600 hover:underline">
+                    {t.teach.add}
+                  </Link>
+                </Empty>
+              ) : null
+            ) : (
+              <Empty>{t.dashboard.noCourses}</Empty>
+            )
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {cards.map(({ course, role }) => {
