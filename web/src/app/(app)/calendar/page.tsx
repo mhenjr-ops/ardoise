@@ -53,10 +53,6 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     .map((r) => ({ role: r.role, course: Array.isArray(r.course) ? r.course[0] : r.course }))
     .filter((r): r is { role: CourseRole; course: CourseLite } => !!r.course);
   const courseById = new Map(mine.map((r) => [r.course.id, r.course]));
-  if (isAdminOrRegistrar) {
-    const { data: all } = await supabase.from("courses").select("id, code, title, color");
-    for (const c of (all ?? []) as CourseLite[]) if (!courseById.has(c.id)) courseById.set(c.id, c);
-  }
   const staffCourses = mine.filter((r) => r.role !== "student").map((r) => r.course);
   const staffIds = new Set(staffCourses.map((c) => c.id));
 
@@ -76,7 +72,10 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
           .lt("due_at", to.toISOString())
       : Promise.resolve({ data: [] as Due[] }),
   ]);
-  const occurrences = expandEvents((evs ?? []) as CalendarEvent[], from, to);
+  // School-wide dates for everyone; class times only for the courses this person is in
+  // (an administrator's calendar is the school's, not every course's timetable).
+  const visible = ((evs ?? []) as CalendarEvent[]).filter((e) => !e.course_id || courseById.has(e.course_id));
+  const occurrences = expandEvents(visible, from, to);
   const dueList = (dues ?? []) as Due[];
   const byDay = new Map<string, { events: Occurrence[]; dues: Due[] }>();
   for (const d of days) byDay.set(d, { events: [], dues: [] });

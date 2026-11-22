@@ -20,7 +20,7 @@ export async function createCourse(formData: FormData) {
   const language = formData.get("language") === "fr" ? "fr" : "en";
   const teacherEmail = String(formData.get("teacher_email") ?? "").trim();
   const departmentId = String(formData.get("department_id") ?? "") || null;
-  if (!code || !title) redirect("/admin?error=invalid");
+  if (!code || !title) redirect("/admin/courses?error=invalid");
 
   const { supabase } = await actionSession();
   const { count } = await supabase
@@ -34,7 +34,7 @@ export async function createCourse(formData: FormData) {
     .insert({ institution_id: institutionId, code, title, level, language, color, department_id: departmentId })
     .select("id")
     .single();
-  if (error || !data) redirect("/admin?error=forbidden");
+  if (error || !data) redirect("/admin/courses?error=forbidden");
 
   if (teacherEmail) {
     const { error: enrollError } = await supabase.rpc("enroll_by_email", {

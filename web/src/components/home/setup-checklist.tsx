@@ -22,8 +22,8 @@ export async function SetupChecklist({ supabase, institution, t }: { supabase: C
     { label: t.home.stepStructure, done: (deps.count ?? 0) > 0, href: "/admin/structure" },
     { label: t.home.stepYear, done: (sems.count ?? 0) > 0, href: "/admin/structure" },
     { label: t.home.stepStaff, done: (staff.count ?? 0) > 0, href: "/admin/people" },
-    { label: t.home.stepStudents, done: (roster.count ?? 0) > 0, href: "/admin/students" },
-    { label: t.home.stepCourses, done: (courses.count ?? 0) > 0 && (teaching.count ?? 0) > 0, href: "/admin" },
+    { label: t.home.stepStudents, done: (roster.count ?? 0) > 0, href: "/admin/upload" },
+    { label: t.home.stepCourses, done: (courses.count ?? 0) > 0 && (teaching.count ?? 0) > 0, href: "/admin/upload" },
   ];
   const done = steps.filter((s) => s.done).length;
   if (done === steps.length) return null;

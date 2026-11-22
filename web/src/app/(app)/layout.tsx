@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarDays, GraduationCap, Inbox, LayoutDashboard, LogOut, Settings2, ShieldCheck } from "lucide-react";
+import { CalendarDays, GraduationCap, Inbox, LayoutDashboard, LogOut, MessageSquareText, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
 import { NDOP_CHALK } from "@/lib/ndop";
@@ -28,18 +28,28 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     .map((r) => (Array.isArray(r.course) ? r.course[0] : r.course))
     .filter((c): c is NavCourse => !!c)
     .sort((a, b) => a.code.localeCompare(b.code));
-  if (!courses.length && (can.manageStudents || can.oversees) && institution) {
-    // Row-level security returns only the courses this person oversees.
-    const { data: all } = await supabase.from("courses").select("id, code, title, color").eq("institution_id", institution.id).order("code").limit(12);
-    courses = (all ?? []) as NavCourse[];
-  }
+  // Only the courses this person teaches or studies: an administrator's sidebar is not the
+  // school's course list (that's Admin → Courses, with search).
   const inboxBadge = typeof unreadInbox === "number" ? unreadInbox : 0;
 
   const items: NavItem[] = [];
   let listLabel = t.dashboard.myCourses;
   if (isPlatformAdmin) {
     // The master account: every university, nothing of any one school's own.
-    items.push({ href: "/platform", label: t.master.overview, icon: <ShieldCheck size={19} aria-hidden /> });
+    const [{ count: openChanges }, { count: openDemos }] = await Promise.all([
+      supabase.from("support_requests").select("id", { count: "exact", head: true }).is("handled_at", null),
+      supabase.from("demo_requests").select("id", { count: "exact", head: true }).is("handled_at", null),
+    ]);
+    items.push(
+      { href: "/platform", label: t.master.overview, icon: <ShieldCheck size={19} aria-hidden />, exact: true },
+      {
+        href: "/platform/requests",
+        label: t.master.requests,
+        icon: <MessageSquareText size={19} aria-hidden />,
+        badge: (openChanges ?? 0) + (openDemos ?? 0),
+      },
+      { href: "/platform/team", label: t.master.team, icon: <UsersRound size={19} aria-hidden /> },
+    );
     const { data: schools } = await supabase.from("institutions").select("id, name, slug").order("name");
     courses = ((schools ?? []) as Array<{ id: string; name: string; slug: string }>).map((s) => ({
       id: s.id,

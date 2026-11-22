@@ -1,15 +1,14 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Download, Search, UserCheck } from "lucide-react";
+import { Search, UserCheck } from "lucide-react";
 import { requireInstitution } from "@/lib/session";
 import { errorText, getI18n } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/messages-engage";
 import { formatDate } from "@/lib/format";
 import { Avatar, Badge, Button, Card, CardHeader, Empty, Flash, Input } from "@/components/ui";
-import { RosterImport } from "@/components/admin/roster-import";
 import { ShareLink } from "@/components/copy-button";
 import { siteOrigin } from "@/lib/site";
-import { importRoster, resolveClaim } from "./actions";
+import { resolveClaim } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -53,7 +52,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
     const safe = q.replace(/[%,()]/g, " ");
     list = list.or(`matricule.ilike.%${safe}%,full_name.ilike.%${safe}%`);
   }
-  const [{ data: roster }, { count: total }, { count: linked }, { data: claims }, { data: sems }, { data: currentSem }] = await Promise.all([
+  const [{ data: roster }, { count: total }, { count: linked }, { data: claims }] = await Promise.all([
     list,
     supabase.from("student_roster").select("id", { count: "exact", head: true }).eq("institution_id", institution.id),
     supabase.from("student_roster").select("id", { count: "exact", head: true }).eq("institution_id", institution.id).not("claimed_by", "is", null),
@@ -63,17 +62,8 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
       .eq("institution_id", institution.id)
       .in("status", ["waiting", "disputed"])
       .order("created_at"),
-    supabase
-      .from("semesters")
-      .select("id, label, starts_on, year:academic_years(label)")
-      .eq("institution_id", institution.id)
-      .order("starts_on", { ascending: false, nullsFirst: false }),
-    supabase.rpc("current_semester", { inst: institution.id }),
   ]);
-  const semesterOptions = ((sems ?? []) as Array<{ id: string; label: string; year: { label: string } | { label: string }[] | null }>).map((s) => {
-    const y = Array.isArray(s.year) ? s.year[0] : s.year;
-    return { id: s.id, label: y ? `${s.label} · ${y.label}` : s.label };
-  });
+
   const rows = (roster ?? []) as RosterEntry[];
   const claimRows = (claims ?? []) as ClaimRow[];
 
@@ -105,44 +95,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
         />
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-        <Card className="p-5">
-          <h2 className="font-display text-xl font-semibold">{t.roster.importTitle}</h2>
-          <p className="mb-2 mt-1 text-[14px] text-slate-600">{t.roster.importBody}</p>
-          <p className="mb-2 text-[13px] text-slate-500">{t.roster.columns}</p>
-          <a
-            href="/templates/ardoise-student-list.xlsx"
-            download
-            className="mb-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-brand-600 hover:underline"
-          >
-            <Download size={15} aria-hidden />
-            {t.roster.template}
-          </a>
-          <RosterImport
-            institutionId={institution.id}
-            action={importRoster}
-            semesters={semesterOptions}
-            currentSemester={(currentSem as string | null) ?? null}
-            labels={{
-              chooseFile: t.roster.chooseFile,
-              reading: t.roster.reading,
-              preview: t.roster.preview,
-              detected: t.roster.detected,
-              noMatricule: t.roster.noMatricule,
-              badFile: t.roster.badFile,
-              import: t.roster.import,
-              importing: t.roster.importing,
-              result: t.roster.result,
-              unknownCourses: t.roster.unknownCourses,
-              coursesCreated: t.roster.coursesCreated,
-              semester: t.roster.semester,
-              previewCourses: t.roster.previewCourses,
-              columnNames: t.roster.columnNames,
-              error: t.errors.generic,
-            }}
-          />
-        </Card>
-
+      <div className="grid gap-6">
         <Card>
           <CardHeader title={`${t.roster.claimsTitle} (${claimRows.length})`} />
           <p className="px-5 pt-3 text-[13.5px] text-slate-500">{t.roster.claimsBody}</p>

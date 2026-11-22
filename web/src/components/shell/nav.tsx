@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-export type NavItem = { href: string; label: string; icon: ReactNode; badge?: number };
+export type NavItem = { href: string; label: string; icon: ReactNode; badge?: number; exact?: boolean };
 export type NavCourse = { id: string; code: string; title: string; color: string; href?: string };
 
-function isActive(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function isActive(pathname: string, href: string, exact = false) {
+  return pathname === href || (!exact && pathname.startsWith(`${href}/`));
 }
 
 /** Main navigation on the slate sidebar (desktop). */
@@ -18,7 +18,7 @@ export function SidebarNav({ items, courses, coursesLabel }: { items: NavItem[];
     <nav className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-3 pb-4">
       <ul className="space-y-0.5">
         {items.map((item) => {
-          const active = isActive(pathname, item.href);
+          const active = isActive(pathname, item.href, item.exact);
           return (
             <li key={item.href}>
               <Link
@@ -83,7 +83,7 @@ export function TabBar({ items }: { items: NavItem[] }) {
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       <ul className="mx-auto flex max-w-md justify-around">
         {items.map((item) => {
-          const active = isActive(pathname, item.href);
+          const active = isActive(pathname, item.href, item.exact);
           return (
             <li key={item.href} className="flex-1">
               <Link

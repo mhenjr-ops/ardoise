@@ -28,6 +28,35 @@ export async function markRequestHandled(formData: FormData) {
   const id = field(formData, "id", 40);
   const { supabase, user } = await actionSession();
   await supabase.from("demo_requests").update({ handled_at: new Date().toISOString(), handled_by: user.id }).eq("id", id);
-  revalidatePath("/platform");
-  redirect("/platform");
+  revalidatePath("/platform", "layout");
+  redirect("/platform/requests#demos");
+}
+
+// --- The Ardoise team: the owner adds assistants, each with their own login ---------------------
+
+const TEAM = "/platform/team";
+
+export async function createTeamInvite(formData: FormData) {
+  const name = field(formData, "full_name", 200);
+  const email = field(formData, "email", 320);
+  if (name.length < 2) redirect(`${TEAM}?error=invalid`);
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("create_team_invitation", { p_email: email, p_full_name: name });
+  if (error) redirect(`${TEAM}?error=${error.message.includes("forbidden") ? "forbidden" : "invalid"}`);
+  revalidatePath(TEAM);
+  redirect(`${TEAM}?created=1`);
+}
+
+export async function revokeTeamInvite(formData: FormData) {
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("revoke_team_invitation", { p_invitation: field(formData, "id", 40) });
+  revalidatePath(TEAM);
+  redirect(error ? `${TEAM}?error=forbidden` : TEAM);
+}
+
+export async function removeTeammate(formData: FormData) {
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("remove_teammate", { p_user: field(formData, "user_id", 40) });
+  revalidatePath(TEAM);
+  redirect(error ? `${TEAM}?error=forbidden` : `${TEAM}?ok=1`);
 }

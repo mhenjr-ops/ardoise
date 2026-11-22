@@ -8,10 +8,12 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   // Each tab appears only for the roles that can use it.
   const tabs = [
     { href: "/admin", label: t.lmd.nav.overview, show: can.manageStudents, exact: true },
-    { href: "/admin/people", label: t.nav2.people, show: can.adminArea },
+    { href: "/admin/upload", label: t.nav2.upload, show: can.manageStudents },
     { href: "/admin/students", label: t.nav2.students, show: can.manageStudents },
+    { href: "/admin/courses", label: t.nav2.courses, show: can.manageStudents },
+    { href: "/admin/people", label: t.nav2.people, show: can.adminArea },
     { href: "/admin/structure", label: t.lmd.nav.structure, show: can.adminArea },
-    { href: "/admin/enrollments", label: t.lmd.nav.enrollments, show: can.manageStudents },
+    { href: "/admin/requests", label: t.nav2.requests, show: can.adminArea },
     { href: "/admin/deliberations", label: t.lmd.nav.deliberations, show: can.readResults },
     { href: "/admin/policy", label: t.lmd.nav.policy, show: can.runResults },
   ].filter((tab) => tab.show);

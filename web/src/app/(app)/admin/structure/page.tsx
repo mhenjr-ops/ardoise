@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { CalendarRange, MessageSquareText } from "lucide-react";
 import { requireInstitution } from "@/lib/session";
@@ -5,8 +6,8 @@ import { errorText, getI18n } from "@/lib/i18n/server";
 import { formatDate } from "@/lib/format";
 import { loadStructure } from "@/lib/structure";
 import { StructureTree } from "@/components/structure/structure-tree";
-import { Badge, Button, Card, CardHeader, Flash, Input, Select, Textarea } from "@/components/ui";
-import { mapCourse, requestChange } from "./actions";
+import { Badge, Button, Card, CardHeader, Flash, Input, Select } from "@/components/ui";
+import { mapCourse } from "./actions";
 
 type CourseRow = {
   id: string;
@@ -16,7 +17,6 @@ type CourseRow = {
   coefficient: number;
   component_weights: Record<string, number> | null;
 };
-type Request = { id: string; body: string; created_at: string; handled_at: string | null };
 
 function Section({ id, title, icon, children }: { id: string; title: string; icon?: ReactNode; children: ReactNode }) {
   return (
@@ -33,22 +33,29 @@ function Section({ id, title, icon, children }: { id: string; title: string; ico
  */
 export default async function StructurePage({ searchParams }: PageProps<"/admin/structure">) {
   const [{ supabase, institution, can }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
-  const { error, ok, sent } = await searchParams;
+  const { error, ok, mq } = await searchParams;
+  const mapQuery = typeof mq === "string" ? mq.trim().slice(0, 40) : "";
   const inst = institution.id;
 
-  const [structure, courses, reqs] = await Promise.all([
+  const [structure, reqs] = await Promise.all([
     loadStructure(supabase, inst),
-    supabase.from("courses").select("id, code, title, teaching_unit_id, coefficient, component_weights").eq("institution_id", inst).order("code"),
-    supabase
-      .from("support_requests")
-      .select("id, body, created_at, handled_at")
-      .eq("institution_id", inst)
-      .order("created_at", { ascending: false })
-      .limit(10),
+    supabase.from("support_requests").select("id", { count: "exact", head: true }).eq("institution_id", inst).is("handled_at", null),
   ]);
   const { units, departments, programmes, years, semesters, ues } = structure;
-  const courseList = (courses.data ?? []) as CourseRow[];
-  const requests = (reqs.data ?? []) as Request[];
+  // Official results only: courses are attached to teaching units, a few at a time, by search.
+  let courseList: CourseRow[] = [];
+  if (ues.length && can.manageStudents && mapQuery) {
+    const like = `%${mapQuery.replace(/[%_,()]/g, " ")}%`;
+    const { data } = await supabase
+      .from("courses")
+      .select("id, code, title, teaching_unit_id, coefficient, component_weights")
+      .eq("institution_id", inst)
+      .or(`code.ilike.${like},title.ilike.${like}`)
+      .order("code")
+      .limit(30);
+    courseList = (data ?? []) as CourseRow[];
+  }
+  const openRequests = reqs.count ?? 0;
   const empty = !units.length && !departments.length;
 
   const yearLabel = (id: string) => years.find((y) => y.id === id)?.label ?? "";
@@ -65,7 +72,7 @@ export default async function StructurePage({ searchParams }: PageProps<"/admin/
     <div className="space-y-6">
       <Flash
         error={errorText(t, typeof error === "string" ? error : null)}
-        ok={sent ? t.structure.requestSent : ok ? t.common.saved : null}
+        ok={ok ? t.common.saved : null}
       />
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_360px]">
@@ -77,32 +84,19 @@ export default async function StructurePage({ searchParams }: PageProps<"/admin/
         </div>
 
         <div className="space-y-6">
-          <Section id="request" title={t.structure.requestTitle} icon={<MessageSquareText size={17} aria-hidden />}>
-            <p className="text-[14px] text-slate-600">{t.structure.requestBody}</p>
-            <form action={requestChange} className="space-y-3">
-              <input type="hidden" name="institution_id" value={inst} />
-              <Textarea name="body" required minLength={3} maxLength={4000} rows={empty ? 10 : 4} placeholder={t.structure.requestPlaceholder} />
-              <Button type="submit">{t.structure.requestSend}</Button>
-            </form>
-            {requests.length ? (
-              <div className="border-t border-slate-100 pt-3">
-                <p className="mb-2 text-[13px] font-semibold text-slate-500">{t.structure.requests}</p>
-                <ul className="space-y-2.5">
-                  {requests.map((r) => (
-                    <li key={r.id} className="text-[14px]">
-                      <p className="line-clamp-3 whitespace-pre-line text-slate-700">{r.body}</p>
-                      <p className="mt-0.5 flex items-center gap-2 text-[12.5px] text-slate-500">
-                        {formatDate(locale, r.created_at)}
-                        <Badge tone={r.handled_at ? "success" : "neutral"}>
-                          {r.handled_at ? t.structure.statusDone : t.structure.statusOpen}
-                        </Badge>
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </Section>
+          <Link href="/admin/requests" className="block">
+            <Card lifted className="flex items-center gap-3 p-5 transition-colors hover:border-ardoise">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-ardoise text-chalk">
+                <MessageSquareText size={18} aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-900">{t.schoolRequests.structureLink}</span>
+                <span className="block text-[13.5px] text-slate-500">
+                  {openRequests ? `${openRequests} ${t.structure.statusOpen.toLowerCase()}` : t.schoolRequests.title}
+                </span>
+              </span>
+            </Card>
+          </Link>
 
           <Section id="calendar" title={t.structure.calendar} icon={<CalendarRange size={17} aria-hidden />}>
             {years.length ? (
@@ -168,9 +162,16 @@ export default async function StructurePage({ searchParams }: PageProps<"/admin/
         </Section>
       ) : null}
 
-      {ues.length && courseList.length && can.manageStudents ? (
+      {ues.length && can.manageStudents ? (
         <Section id="mapping" title={t.lmd.courseMapping}>
           <p className="text-sm text-slate-500">{t.lmd.courseMappingHelp}</p>
+          <form className="flex gap-2" role="search" action="/admin/structure#mapping">
+            <Input name="mq" defaultValue={mapQuery} placeholder={t.adminCourses.search} aria-label={t.adminCourses.search} />
+            <Button type="submit" variant="secondary">
+              {t.teach.searchButton}
+            </Button>
+          </form>
+          {mapQuery && !courseList.length ? <p className="text-sm text-slate-500">{t.adminCourses.none}</p> : null}
           <div className="divide-y divide-slate-100">
             {courseList.map((c) => (
               <form key={c.id} action={mapCourse} className="grid items-end gap-2 py-3 sm:grid-cols-[1.4fr_1.4fr_70px_1.2fr_auto]">

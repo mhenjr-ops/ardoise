@@ -13,6 +13,7 @@ const KNOWN = [
   "topic_locked",
   "in_use",
   "platform_account",
+  "school_account",
 ];
 
 /** Turns a Supabase/Postgres error into one of the translated error codes. */

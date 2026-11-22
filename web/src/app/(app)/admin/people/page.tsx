@@ -1,5 +1,6 @@
+import Link from "next/link";
 import type { Metadata } from "next";
-import { Link2, UserMinus } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Link2, Search, UserMinus } from "lucide-react";
 import { requireInstitution } from "@/lib/session";
 import { errorText, getI18n } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/messages-engage";
@@ -7,7 +8,7 @@ import { formatDate } from "@/lib/format";
 import { siteOrigin } from "@/lib/site";
 import { ROLE_ORDER, canGrant, grantableRoles } from "@/lib/roles";
 import type { InstitutionRole } from "@/lib/types";
-import { Avatar, Badge, Card, CardHeader, Empty, Flash } from "@/components/ui";
+import { Avatar, Badge, Button, Card, CardHeader, Empty, Flash, Input, Select } from "@/components/ui";
 import { ShareLink } from "@/components/copy-button";
 import { InviteForm } from "@/components/admin/invite-form";
 import { createInvitation, revokeInvitation, revokeRole } from "./actions";
@@ -17,14 +18,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t.staffing.title };
 }
 
-type Row = {
-  id: string;
+type StaffRow = {
   user_id: string;
-  role: InstitutionRole;
-  faculty_id: string | null;
-  department_id: string | null;
-  profile: { full_name: string; email: string } | { full_name: string; email: string }[] | null;
+  full_name: string;
+  email: string;
+  roles: Array<{ id: string; role: InstitutionRole; faculty_id: string | null; department_id: string | null }>;
+  total: number;
 };
+
+const PAGE = 30;
 type Invite = {
   id: string;
   role: InstitutionRole;
@@ -41,12 +43,18 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
   const [{ supabase, institution, memberships: mine, user }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
   const params = await searchParams;
 
-  const [{ data: rows }, { data: invites }, { data: facs }, { data: deps }, origin] = await Promise.all([
-    supabase
-      .from("memberships")
-      .select("id, user_id, role, faculty_id, department_id, profile:profiles(full_name, email)")
-      .eq("institution_id", institution.id)
-      .neq("role", "student"),
+  const q = typeof params.q === "string" ? params.q.slice(0, 80) : "";
+  const roleFilter = typeof params.role === "string" && (ROLE_ORDER as string[]).includes(params.role) ? params.role : "";
+  const page = Math.max(1, Number(params.p) || 1);
+
+  const [{ data: rows }, { data: invites }, { data: facs }, { data: deps }, origin, { count: ownerCount }] = await Promise.all([
+    supabase.rpc("admin_staff", {
+      p_institution: institution.id,
+      p_query: q,
+      p_role: roleFilter || null,
+      p_offset: (page - 1) * PAGE,
+      p_limit: PAGE,
+    }),
     supabase
       .from("invitations")
       .select("id, role, faculty_id, department_id, email, full_name, token, expires_at, created_by")
@@ -58,6 +66,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
     supabase.from("faculties").select("id, name").eq("institution_id", institution.id).order("name"),
     supabase.from("departments").select("id, name, faculty_id").eq("institution_id", institution.id).order("name"),
     siteOrigin(),
+    supabase.from("memberships").select("id", { count: "exact", head: true }).eq("institution_id", institution.id).eq("role", "owner"),
   ]);
   const faculties = (facs ?? []) as Array<{ id: string; name: string }>;
   const departments = (deps ?? []) as Array<{ id: string; name: string; faculty_id: string | null }>;
@@ -74,19 +83,24 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
     ? departments
     : departments.filter((d) => canGrant(mine, "teacher", null, d.id, facultyOf) || canGrant(mine, "hod", null, d.id, facultyOf));
 
-  // One entry per person, with all their roles.
-  const people = new Map<string, { name: string; email: string; roles: Row[] }>();
-  for (const r of (rows ?? []) as Row[]) {
-    const p = Array.isArray(r.profile) ? r.profile[0] : r.profile;
-    const entry = people.get(r.user_id) ?? { name: p?.full_name || p?.email || "", email: p?.email ?? "", roles: [] };
-    entry.roles.push(r);
-    people.set(r.user_id, entry);
-  }
-  const rank = (e: { roles: Row[] }) => Math.min(...e.roles.map((r) => ROLE_ORDER.indexOf(r.role)));
-  const list = [...people.values()].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, locale));
+  // One entry per person, with all their roles: searched and paged by the database.
+  const list = ((rows ?? []) as StaffRow[]).map((p) => ({
+    userId: p.user_id,
+    name: p.full_name || p.email,
+    email: p.email,
+    roles: p.roles.map((r) => ({ ...r, user_id: p.user_id })),
+  }));
+  const total = rows?.[0] ? Number((rows[0] as StaffRow).total) : 0;
+  const pageHref = (n: number) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (roleFilter) sp.set("role", roleFilter);
+    if (n > 1) sp.set("p", String(n));
+    const str = sp.toString();
+    return (str ? `/admin/people?${str}` : "/admin/people") as "/admin/people";
+  };
   // Just created: the newest open link this user made.
   const fresh = params.created ? ((invites ?? []) as Invite[]).find((v) => v.created_by === user.id) : undefined;
-  const ownerCount = ((rows ?? []) as Row[]).filter((r) => r.role === "owner").length;
 
   return (
     <div className="space-y-6">
@@ -175,50 +189,103 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
           </Card>
         </div>
 
-        <Card>
-          <CardHeader title={`${t.staffing.members} (${list.length})`} />
+        <Card className="self-start">
+          <CardHeader title={`${t.staffing.members} (${total})`} />
+          <form className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3" role="search">
+            <div className="relative min-w-[11rem] flex-1">
+              <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Input name="q" defaultValue={q} placeholder={t.staffList.search} aria-label={t.staffList.search} className="pl-9" />
+            </div>
+            <Select name="role" defaultValue={roleFilter} aria-label={t.staffing.role} className="w-auto">
+              <option value="">{t.staffList.allRoles}</option>
+              {ROLE_ORDER.filter((r) => r !== "student").map((r) => (
+                <option key={r} value={r}>
+                  {t.roles[r]}
+                </option>
+              ))}
+            </Select>
+            <Button type="submit" variant="secondary">
+              {t.teach.searchButton}
+            </Button>
+          </form>
           {list.length === 0 ? (
             <div className="p-5">
-              <Empty>{t.staffing.noPending}</Empty>
+              <Empty>{q || roleFilter ? t.staffList.none : t.staffing.noPending}</Empty>
             </div>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {list.map((p) => (
-                <li key={p.roles[0].user_id} className="flex items-start gap-3 px-5 py-3.5">
-                  <Avatar name={p.name || p.email} size={36} />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-semibold text-slate-900">{p.name}</p>
-                    <p className="truncate text-[13.5px] text-slate-500">{p.email}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {p.roles
-                        .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role))
-                        .map((r) => {
-                          const removable =
-                            canGrant(mine, r.role, r.faculty_id, r.department_id, facultyOf) && !(r.role === "owner" && ownerCount <= 1);
-                          return (
-                            <span key={r.id} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 pl-2.5 pr-1 text-[13px] font-semibold text-brand-700 ring-1 ring-brand-100">
-                              {t.roles[r.role]}
-                              {scopeOf(r) ? <span className="font-normal text-brand-600">· {scopeOf(r)}</span> : null}
-                              {removable ? (
-                                <form action={revokeRole}>
-                                  <input type="hidden" name="id" value={r.id} />
-                                  <button type="submit" title={t.staffing.remove} className="grid h-5 w-5 place-items-center rounded-full text-brand-500 hover:bg-terracotta-50 hover:text-terracotta-600">
-                                    <UserMinus size={12} aria-hidden />
-                                    <span className="sr-only">{t.staffing.remove}</span>
-                                  </button>
-                                </form>
-                              ) : (
-                                <span className="w-1" />
-                              )}
-                            </span>
-                          );
-                        })}
-                    </div>
-                  </div>
-                </li>
-              ))}
+              {list.map((p) => {
+                const sorted = [...p.roles].sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+                return (
+                  <li key={p.userId}>
+                    <details className="group">
+                      <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                        <Avatar name={p.name} size={34} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-semibold text-slate-900">{p.name}</span>
+                          <span className="block truncate text-[13px] text-slate-500">
+                            {t.roles[sorted[0].role]}
+                            {scopeOf(sorted[0]) ? ` · ${scopeOf(sorted[0])}` : ""}
+                            {sorted.length > 1 ? ` +${sorted.length - 1}` : ""}
+                          </span>
+                        </span>
+                        <ChevronDown size={16} aria-hidden className="shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="space-y-2 px-5 pb-4 pl-[4.25rem]">
+                        <p className="truncate text-[13.5px] text-slate-500">{p.email}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {sorted.map((r) => {
+                            const removable =
+                              canGrant(mine, r.role, r.faculty_id, r.department_id, facultyOf) && !(r.role === "owner" && (ownerCount ?? 0) <= 1);
+                            return (
+                              <span key={r.id} className="inline-flex items-center gap-1 rounded-full bg-brand-50 py-0.5 pl-2.5 pr-1 text-[13px] font-semibold text-brand-700 ring-1 ring-brand-100">
+                                {t.roles[r.role]}
+                                {scopeOf(r) ? <span className="font-normal text-brand-600">· {scopeOf(r)}</span> : null}
+                                {removable ? (
+                                  <form action={revokeRole}>
+                                    <input type="hidden" name="id" value={r.id} />
+                                    <button type="submit" title={t.staffing.remove} className="grid h-5 w-5 place-items-center rounded-full text-brand-500 hover:bg-terracotta-50 hover:text-terracotta-600">
+                                      <UserMinus size={12} aria-hidden />
+                                      <span className="sr-only">{t.staffing.remove}</span>
+                                    </button>
+                                  </form>
+                                ) : (
+                                  <span className="w-1" />
+                                )}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </details>
+                  </li>
+                );
+              })}
             </ul>
           )}
+          {total > PAGE ? (
+            <nav className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-[14px] font-semibold">
+              {page > 1 ? (
+                <Link href={pageHref(page - 1)} className="inline-flex items-center gap-1 text-brand-600 hover:underline">
+                  <ChevronLeft size={15} aria-hidden />
+                  {t.adminCourses.previous}
+                </Link>
+              ) : (
+                <span />
+              )}
+              <span className="font-normal text-slate-500">
+                {fmt(t.adminCourses.showing, { from: (page - 1) * PAGE + 1, to: (page - 1) * PAGE + list.length, n: total })}
+              </span>
+              {page * PAGE < total ? (
+                <Link href={pageHref(page + 1)} className="inline-flex items-center gap-1 text-brand-600 hover:underline">
+                  {t.adminCourses.next}
+                  <ChevronRight size={15} aria-hidden />
+                </Link>
+              ) : (
+                <span />
+              )}
+            </nav>
+          ) : null}
         </Card>
       </div>
     </div>

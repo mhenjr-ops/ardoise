@@ -11,19 +11,6 @@ function str(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
 
-/** The school asks the Ardoise team for a change to its structure. */
-export async function requestChange(formData: FormData) {
-  const body = str(formData, "body").slice(0, 4000);
-  if (body.length < 3) redirect(`${BACK}?error=invalid#request`);
-  const { supabase, user } = await actionSession();
-  const { error } = await supabase
-    .from("support_requests")
-    .insert({ institution_id: str(formData, "institution_id"), body, created_by: user.id });
-  if (error) redirect(`${BACK}?error=${errorCode(error)}#request`);
-  revalidatePath(BACK);
-  redirect(`${BACK}?sent=1#request`);
-}
-
 /** Attaches a course to a UE (its semester follows the UE), with coefficient and optional weights. */
 export async function mapCourse(formData: FormData) {
   const courseId = str(formData, "course_id");

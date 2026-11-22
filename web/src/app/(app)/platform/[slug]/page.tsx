@@ -1,15 +1,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, ChevronDown, Pencil } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { errorText, getI18n } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/messages-engage";
 import { formatDate } from "@/lib/format";
-import { siteOrigin } from "@/lib/site";
 import { loadStructure, type Department, type Programme, type Unit } from "@/lib/structure";
 import { StructureTree } from "@/components/structure/structure-tree";
-import { ShareLink } from "@/components/copy-button";
 import { Badge, Button, Card, CardHeader, Empty, Field, Flash, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import {
   addSemester,
@@ -38,7 +36,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
   const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale").eq("slug", slug).maybeSingle();
   if (!school) notFound();
 
-  const [structure, { data: reqs }, origin, { data: allStats }, { data: office }] = await Promise.all([
+  const [structure, { data: reqs }, { data: allStats }, { data: office }] = await Promise.all([
     loadStructure(supabase, school.id),
     supabase
       .from("support_requests")
@@ -47,7 +45,6 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
       .order("handled_at", { ascending: true, nullsFirst: true })
       .order("created_at", { ascending: false })
       .limit(30),
-    siteOrigin(),
     supabase.rpc("platform_schools"),
     supabase.rpc("platform_school_people", { p_institution: school.id }),
   ]);
@@ -56,9 +53,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
     ? [
         { label: t.master.students, value: st.students_joined, suffix: fmt(t.master.onList, { n: st.students_listed }) },
         { label: t.master.staff, value: st.staff },
-        { label: t.master.courses, value: st.courses },
-        { label: t.master.departments, value: st.departments },
-        { label: t.master.active, value: st.active_week },
+        { label: t.master.users, value: st.users },
       ]
     : [];
   const people = (office ?? []) as Array<{ role: string; full_name: string; email: string; scope: string | null; last_sign_in_at: string | null }>;
@@ -193,7 +188,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
       <PageHeader title={school.name} subtitle={`/join/${school.slug} · ${t.master.role}`} />
       <Flash error={error} ok={ok} />
       {stats.length ? (
-        <dl className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
+        <dl className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:max-w-3xl">
           {stats.map((x) => (
             <div key={x.label} className="rounded-2xl border border-slate-200 bg-paper px-4 py-3">
               <dt className="text-[12.5px] font-semibold text-slate-500">{x.label}</dt>
@@ -291,14 +286,6 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
             </form>
           </Card>
 
-          <Card className="p-5">
-            <p className="mb-2 text-[14px] font-semibold text-slate-700">{t.structure.studentLink}</p>
-            <ShareLink
-              url={`${origin}/join/${school.slug}`}
-              message={fmt(t.share.studentMessage, { institution: school.name })}
-              labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
-            />
-          </Card>
         </div>
       </div>
 
@@ -416,9 +403,18 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
           </div>
         </Card>
 
-        <Card id="ues" className="scroll-mt-6">
-          <CardHeader title={t.structure.ues} />
-          <div className="space-y-4 px-5 py-4">
+        <details id="ues" className="group scroll-mt-6 rounded-[var(--radius-card)] border border-slate-200 bg-paper" open={ues.length > 0}>
+          <summary className="flex cursor-pointer list-none items-start gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+            <span className="min-w-0 flex-1">
+              <span className="block font-display text-lg font-semibold text-slate-900">
+                {t.master.ueTitle}
+                {ues.length ? <span className="ml-2 text-[14px] font-normal text-slate-500">({ues.length})</span> : null}
+              </span>
+              <span className="mt-0.5 block text-[13.5px] leading-relaxed text-slate-500">{t.master.ueHelp}</span>
+            </span>
+            <ChevronDown size={18} aria-hidden className="mt-1 shrink-0 text-slate-400 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="space-y-4 border-t border-slate-100 px-5 py-4">
             {ues.length ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-[14px]">
@@ -449,7 +445,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
                 </table>
               </div>
             ) : null}
-            <details className="rounded-xl border border-slate-200 p-4" open={ues.length === 0 && programmes.length > 0 && semesters.length > 0}>
+            <details className="rounded-xl border border-slate-200 p-4">
               <summary className="cursor-pointer text-[14px] font-semibold text-slate-800">{t.structure.addUe}</summary>
               <form action={addUe} className="mt-3 grid gap-3 sm:grid-cols-2">
                 {common}
@@ -489,7 +485,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
               </form>
             </details>
           </div>
-        </Card>
+        </details>
       </div>
     </>
   );

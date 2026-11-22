@@ -2,8 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-
-const KNOWN = ["invitation_invalid", "invitation_used", "invitation_expired", "invitation_wrong_email", "platform_account"];
+import { acceptAnyInvitation } from "@/lib/joining";
 
 export async function acceptInvitation(formData: FormData) {
   const token = String(formData.get("token") ?? "").slice(0, 100);
@@ -12,12 +11,8 @@ export async function acceptInvitation(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(`/join/${token}`)}`);
-  const { error } = await supabase.rpc("accept_invitation", { p_token: token });
-  if (error) {
-    const code = KNOWN.find((k) => error.message.includes(k)) ?? "generic";
-    redirect(`/join/${token}?error=${code}`);
-  }
-  redirect("/dashboard");
+  const result = await acceptAnyInvitation(supabase, token);
+  redirect("to" in result ? (result.to as "/dashboard") : `/join/${token}?error=${result.error}`);
 }
 
 /** Sign out and come back to the same invitation (to accept it with another account). */

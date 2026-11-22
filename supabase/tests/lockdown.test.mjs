@@ -17,6 +17,6 @@ check('the Ardoise team can create a school (triggers still fire)', !!inst);
 const pub = await as(null, `select string_agg(p.proname, ',' order by p.proname) as names
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')`, [], 'anon');
-check('signed-out visitors can only verify transcripts, preview invitations, request a demo, list schools and sign in with a matricule',
-  pub.rows[0].names === 'invitation_preview,login_email,request_demo,school_directory,verify_transcript');
+check('signed-out visitors can only verify transcripts, preview invitations, request a demo, list schools, preview a team invitation and sign in with a matricule',
+  pub.rows[0].names === 'invitation_preview,login_email,request_demo,school_directory,team_invitation_preview,verify_transcript');
 done();

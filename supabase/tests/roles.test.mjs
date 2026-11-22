@@ -275,7 +275,7 @@ await expectError('a school member cannot be made an Ardoise team account',
 const schools = (await as('P', `select * from public.platform_schools()`)).rows;
 const ut = schools.find((x) => x.slug === 'ut');
 check('the master dashboard sees every school with its numbers',
-  !!ut && ut.students_listed >= 4 && ut.students_joined >= 4 && ut.staff >= 5 && ut.courses >= 2 && ut.departments === 4 && ut.open_requests === 2);
+  !!ut && ut.students_listed >= 4 && ut.students_joined >= 4 && ut.staff >= 5 && ut.users === ut.students_joined + ut.staff && ut.open_requests === 2);
 await expectError('a school owner cannot see the master numbers', () => as('O', `select * from public.platform_schools()`), 'forbidden');
 const office = (await as('P', `select * from public.platform_school_people($1)`, [inst])).rows;
 check('the master dashboard shows who runs a school', office[0]?.role === 'owner' && office.some((x) => x.role === 'registrar'));
@@ -293,5 +293,42 @@ await expectError('the admin cannot remove the owner', () => as('AD', `select pu
 await expectError('the last owner cannot be removed', () => as('O', `select public.revoke_role($1)`, [ownerRow]), 'last_owner');
 await expectError('nobody writes memberships directly',
   () => as('AD', `insert into public.memberships (institution_id, user_id, role) values ($1, $2, 'admin')`, [inst, ids.Z]), 'row-level security');
+
+// --- Programme and level straight from the registrar's file -------------------------------
+await as('R', `select public.import_roster($1, $2::jsonb, $3, $4::jsonb)`, [inst,
+  JSON.stringify([{ matricule: s1Mat, programme: 'LMATH', level: 'L1' }]), sem,
+  JSON.stringify([{ code: 'MAT 301', title: 'Algèbre', department: 'Mathématiques', faculty: 'FS', level: 'L3' }])]);
+check('a student on the list is in their programme and level for the year, without anyone registering them',
+  (await count('R', `select count(*) n from public.programme_enrollments pe join public.programmes p on p.id = pe.programme_id where p.code = 'LMATH' and pe.student_id = $1 and pe.level = 'L1'`, [ids.S1])) === 1);
+check('a courses file carries the department (settled by faculty) and level',
+  (await count('R', `select count(*) n from public.courses where code = 'MAT301' and department_id = $1 and level = 'L3'`, [math])) === 1);
+await as('R', `select public.import_roster($1, '[]'::jsonb, $2, $3::jsonb)`, [inst, sem, JSON.stringify([{ code: 'HIS201', department: 'Histoire', level: 'L2' }])]);
+check('a later file fills in what an earlier one left out', (await count('R', `select count(*) n from public.courses where code = 'HIS201' and level = 'L2'`)) === 1);
+
+// --- Searched, paged lists for administrators ------------------------------------------------
+const page1 = (await as('R', `select * from public.admin_courses($1, 'his', null, 0, 1)`, [inst])).rows;
+check('the course list is searched and paged, with its total', page1.length === 1 && Number(page1[0].total) === 2);
+const byDept = (await as('R', `select * from public.admin_courses($1, '', $2)`, [inst, math])).rows;
+check('…and filtered by department', byDept.length >= 1 && byDept.every((c) => c.department === 'Mathématiques'));
+await expectError('a lecturer cannot list every course', () => as('T', `select * from public.admin_courses($1)`, [inst]), 'forbidden');
+const staffPage = (await as('AD', `select * from public.admin_staff($1, '', 'teacher', 0, 50)`, [inst])).rows;
+check('the staff list is filtered by role, one entry per person with all their roles',
+  staffPage.length >= 2 && staffPage.every((p) => p.roles.some((r) => r.role === 'teacher')));
+await expectError('students cannot list the staff', () => as('S1', `select * from public.admin_staff($1)`, [inst]), 'forbidden');
+
+// --- The Ardoise team: its owner invites assistants with their own login ------------------
+const teamTok = (await one('P', `select public.create_team_invitation('', 'Assistant') as t`)).t;
+check('the team owner creates a link for an assistant', typeof teamTok === 'string' && teamTok.length >= 60);
+check('anyone with the link sees what it is', (await as(null, `select public.team_invitation_preview($1) as p`, [teamTok], 'anon')).rows[0].p.status === 'open');
+await expectError('a school member cannot use it', () => as('O', `select public.accept_team_invitation($1)`, [teamTok]), 'school_account');
+await as('Z', `select public.accept_team_invitation($1)`, [teamTok]);
+check('the assistant is on the team with their own login', (await count('Z', `select count(*) n from public.platform_team()`)) === 2
+  && (await one('Z', `select role from public.platform_team() where user_id = $1`, [ids.Z])).role === 'member');
+check('the assistant sees every school', (await count('Z', `select count(*) n from public.platform_schools()`)) >= 1);
+await expectError('an assistant cannot invite more people', () => as('Z', `select public.create_team_invitation('', 'X')`), 'forbidden');
+await expectError('an assistant cannot remove the owner', () => as('Z', `select public.remove_teammate($1)`, [ids.P]), 'forbidden');
+await as('P', `select public.remove_teammate($1)`, [ids.Z]);
+check('the owner removes an assistant', (await count('P', `select count(*) n from public.platform_team()`)) === 1);
+await expectError('a removed assistant sees nothing', () => as('Z', `select * from public.platform_schools()`), 'forbidden');
 
 done();

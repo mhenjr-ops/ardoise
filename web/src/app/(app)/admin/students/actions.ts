@@ -25,9 +25,13 @@ export async function importRoster(
 ): Promise<ImportResult | { error: string }> {
   const { supabase } = await actionSession();
   const total: ImportResult = { created: 0, updated: 0, course_links: 0, enrolled: 0, claims_linked: 0, unknown_courses: [], courses_created: 0 };
-  const courseList = (Array.isArray(courses) ? courses : [])
-    .slice(0, 2000)
-    .map((c) => ({ code: String(c.code ?? "").slice(0, 40), title: String(c.title ?? "").slice(0, 200) }));
+  const courseList = (Array.isArray(courses) ? courses : []).slice(0, 2000).map((c) => ({
+    code: String(c.code ?? "").slice(0, 40),
+    title: String(c.title ?? "").slice(0, 200),
+    department: String(c.department ?? "").slice(0, 200),
+    faculty: String(c.faculty ?? "").slice(0, 200),
+    level: String(c.level ?? "").slice(0, 20),
+  }));
   const clean = rows.slice(0, 50000).map((r) => ({
     matricule: String(r.matricule ?? "").slice(0, 40),
     full_name: String(r.full_name ?? "").slice(0, 200),
@@ -55,6 +59,7 @@ export async function importRoster(
     for (const c of r.unknown_courses ?? []) if (!total.unknown_courses.includes(c)) total.unknown_courses.push(c);
   }
   revalidatePath("/admin/students");
+  revalidatePath("/admin/courses");
   return total;
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectColumns, parseCsv, rowsFromTable, splitCourses } from "./roster";
+import { coursesFromTable, detectColumns, parseCsv, readWorkbook, rowsFromTable, splitCourses } from "./roster";
 
 describe("student list import", () => {
   it("recognises French and English headers in any order", () => {
@@ -60,15 +60,42 @@ describe("student list import", () => {
 });
 
 
+describe("courses sheets and whole workbooks", () => {
+  it("reads a courses sheet with department, faculty and level", () => {
+    const list = coursesFromTable([
+      ["Course code", "Course title", "Department", "Faculty", "Level"],
+      ["CEC 203", "Digital Electronics", "Computer Engineering", "NAHPI", "200"],
+      ["", "no code", "", "", ""],
+    ]);
+    expect(list).toEqual([{ code: "CEC203", title: "Digital Electronics", department: "Computer Engineering", faculty: "NAHPI", level: "200" }]);
+  });
+
+  it("merges students across sheets and prefers the courses sheet's details", () => {
+    const r = readWorkbook([
+      { name: "Courses", data: [["Code", "Title", "Department"], ["CSC201", "Data Structures", "Mathematics and Computer Science"]] },
+      { name: "Students", data: [["Matricule", "Name", "Course code", "Course title"], ["UBa1", "A B", "CSC201", "Data Structures and Algorithms"]] },
+      { name: "More", data: [["Matricule", "Course code"], ["UBa1", "MAT201"]] },
+    ]);
+    expect(r.sheets).toEqual({ students: ["Students", "More"], courses: ["Courses"] });
+    expect(r.rows).toEqual([expect.objectContaining({ matricule: "UBA1", courses: ["CSC201", "MAT201"] })]);
+    expect(r.courses).toEqual([{ code: "CSC201", title: "Data Structures", department: "Mathematics and Computer Science" }]);
+  });
+});
+
 describe("the downloadable Excel template", () => {
-  it("is read back as students and courses", async () => {
-    const { readSheet } = await import("read-excel-file/node");
-    const table = await readSheet("public/templates/ardoise-student-list.xlsx");
-    const r = rowsFromTable(table as Parameters<typeof rowsFromTable>[0]);
+  it("is read back as courses and students", async () => {
+    const { default: readXlsxFile } = await import("read-excel-file/node");
+    const sheets = await readXlsxFile("public/templates/ardoise-student-list.xlsx");
+    const r = readWorkbook(sheets.map((x) => ({ name: x.sheet, data: x.data as Parameters<typeof readWorkbook>[0][number]["data"] })));
+    expect(r.sheets).toEqual({ students: ["Students"], courses: ["Courses"] });
     expect(r.rows.map((x) => [x.matricule, x.courses])).toEqual([
       ["UBA25S0217", ["CSC201", "MAT201"]],
       ["UBA25S0218", ["CSC201", "MAT201"]],
     ]);
-    expect(r.courses.map((c) => c.title)).toEqual(["Data Structures and Algorithms", "Linear Algebra I"]);
+    expect(r.courses.map((c) => [c.code, c.department])).toEqual([
+      ["CSC201", "Mathematics and Computer Science"],
+      ["MAT201", "Mathematics and Computer Science"],
+      ["CEC203", "Computer Engineering"],
+    ]);
   });
 });

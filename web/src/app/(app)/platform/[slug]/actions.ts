@@ -168,11 +168,14 @@ export async function addUe(formData: FormData) {
 }
 
 export async function markSupportDone(formData: FormData) {
-  const back = str(formData, "back", 100) === "/platform" ? "/platform" : page(formData);
+  const from = str(formData, "back", 100);
+  const back = from === "/platform/requests" ? from : page(formData);
   const { supabase, user } = await actionSession();
   await supabase
     .from("support_requests")
     .update({ handled_at: new Date().toISOString(), handled_by: user.id })
     .eq("id", str(formData, "id", 40));
+  revalidatePath("/platform/requests");
+  revalidatePath("/platform", "layout");
   done(back, "requests");
 }

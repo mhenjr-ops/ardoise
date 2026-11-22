@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Building2, MailCheck, UserRound } from "lucide-react";
+import { Building2, MailCheck, ShieldCheck, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { isInviteToken, schoolDirectory } from "@/lib/joining";
 import { getI18n } from "@/lib/i18n/server";
@@ -25,6 +25,7 @@ type Preview = {
   email_hint: string | null;
   status: "open" | "used" | "expired" | "revoked";
 } | null;
+type TeamPreview = { full_name: string; email_hint: string | null; status: "open" | "used" | "expired" | "revoked" } | null;
 
 export default async function JoinPage({ params, searchParams }: PageProps<"/join/[token]">) {
   const { token } = await params;
@@ -42,11 +43,14 @@ export default async function JoinPage({ params, searchParams }: PageProps<"/joi
     }
   }
 
-  const [{ data }, { data: auth }] = await Promise.all([
+  const [{ data }, { data: teamData }, { data: auth }] = await Promise.all([
     supabase.rpc("invitation_preview", { p_token: token.slice(0, 100) }),
+    supabase.rpc("team_invitation_preview", { p_token: token.slice(0, 100) }),
     supabase.auth.getUser(),
   ]);
-  const v = data as Preview;
+  // A university invitation, or an invitation to the Ardoise team: same kind of link.
+  const team = (data ? null : teamData) as TeamPreview;
+  const v: Preview = (data as Preview) ?? (team ? { ...team, institution: "Ardoise", role: "admin", faculty: null, department: null } : null);
   const user = auth.user;
   const next = encodeURIComponent(`/join/${token}`);
   const errorText =
@@ -60,27 +64,36 @@ export default async function JoinPage({ params, searchParams }: PageProps<"/joi
 
   return (
     <PublicShell locale={locale}>
-      <h1 className="font-display text-[2.4rem] font-semibold leading-tight">{t.join.title}</h1>
+      <h1 className="font-display text-[2.4rem] font-semibold leading-tight">{team ? t.join.teamTitle : t.join.title}</h1>
       {closed || !v ? (
         <Card className="mt-6 p-6 text-[15px] text-slate-700">{closed}</Card>
       ) : (
         <>
-          <p className="mt-2 text-[17px] text-slate-600">{fmt(t.join.body, { institution: v.institution })}</p>
+          <p className="mt-2 text-[17px] text-slate-600">{team ? t.join.teamBody : fmt(t.join.body, { institution: v.institution })}</p>
           <Flash error={errorText} />
           <Card className="mt-6 divide-y divide-slate-100">
             <div className="flex items-center gap-4 px-6 py-5">
               <span className="grid h-11 w-11 place-items-center rounded-xl bg-ardoise text-chalk">
-                <Building2 size={20} aria-hidden />
+                {team ? <ShieldCheck size={20} aria-hidden /> : <Building2 size={20} aria-hidden />}
               </span>
               <div>
-                <p className="font-display text-xl font-semibold">{v.institution}</p>
+                <p className="font-display text-xl font-semibold">{team ? t.master.teamTitle : v.institution}</p>
                 <p className="text-[15px] text-slate-600">
-                  {t.join.as} <strong className="text-slate-900">{t.roles[v.role]}</strong>
-                  {v.department ? ` · ${v.department}` : v.faculty ? ` · ${v.faculty}` : ""}
+                  {team ? (
+                    <>
+                      {v.full_name ? `${v.full_name}, ` : ""}
+                      {t.master.member.toLowerCase()}
+                    </>
+                  ) : (
+                    <>
+                      {t.join.as} <strong className="text-slate-900">{t.roles[v.role]}</strong>
+                      {v.department ? ` · ${v.department}` : v.faculty ? ` · ${v.faculty}` : ""}
+                    </>
+                  )}
                 </p>
               </div>
             </div>
-            <p className="px-6 py-4 text-[14.5px] text-slate-600">{t.roleHelp[v.role]}</p>
+            <p className="px-6 py-4 text-[14.5px] text-slate-600">{team ? t.master.teamIntro : t.roleHelp[v.role]}</p>
             {v.email_hint ? (
               <p className="flex items-center gap-2 px-6 py-4 text-[14.5px] text-slate-600">
                 <MailCheck size={17} className="text-brand-600" aria-hidden />
