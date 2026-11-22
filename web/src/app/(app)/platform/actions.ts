@@ -48,15 +48,17 @@ export async function createTeamInvite(formData: FormData) {
   const email = field(formData, "email", 320);
   if (name.length < 2) redirect(`${TEAM}?error=invalid`);
   const { supabase } = await actionSession();
-  const { error } = await supabase.rpc("create_team_invitation", {
+  const { data: token, error } = await supabase.rpc("create_team_invitation", {
     p_email: email,
     p_full_name: name,
     p_title: field(formData, "title", 80),
     p_reports_to: person(formData, "reports_to"),
   });
   if (error) redirect(`${TEAM}?error=${error.message.includes("forbidden") ? "forbidden" : "invalid"}`);
+  // The page shows this one link (by id; the token never goes in the address bar).
+  const { data: made } = await supabase.from("platform_invitations").select("id").eq("token", token as string).maybeSingle();
   revalidatePath(TEAM);
-  redirect(`${TEAM}?created=1`);
+  redirect(made ? `${TEAM}?created=${made.id}` : TEAM);
 }
 
 /** The owner changes what someone does and whom they report to. */

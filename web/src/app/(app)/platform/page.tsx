@@ -143,8 +143,7 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
                 <p className="mb-2 text-[14px] font-semibold text-slate-800">{fmt(t.platform.ownerLink, { institution: l.name })}</p>
                 <ShareLink
                   url={`${origin}/join/${l.token}`}
-                  message={fmt(t.share.message, { institution: l.name, role: t.roles.owner })}
-                  labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
+                  labels={{ copy: t.share.copy, copied: t.share.copied }}
                 />
               </li>
             ))}

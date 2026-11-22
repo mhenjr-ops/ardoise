@@ -62,7 +62,8 @@ export default async function PlatformTeamPage({ searchParams }: PageProps<"/pla
   const invites = (links ?? []) as Invite[];
   const isOwner = mates.some((m) => m.user_id === user.id && m.role === "owner");
   const owner = mates.find((m) => m.role === "owner") ?? mates[0];
-  const fresh = sp.created ? [...invites].reverse().find((l) => l.created_by === user.id) : undefined;
+  // Just created: that link, until it's used or the card is closed.
+  const fresh = typeof sp.created === "string" ? invites.find((l) => l.id === sp.created) : undefined;
 
   // The chart: everyone under their manager (or the owner), people still invited under theirs.
   const known = new Set(mates.map((m) => m.user_id));
@@ -98,8 +99,7 @@ export default async function PlatformTeamPage({ searchParams }: PageProps<"/pla
   const share = (l: Invite) => (
     <ShareLink
       url={`${origin}/join/${l.token}`}
-      message={t.master.teamShare}
-      labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
+      labels={{ copy: t.share.copy, copied: t.share.copied }}
     />
   );
 
@@ -256,7 +256,12 @@ export default async function PlatformTeamPage({ searchParams }: PageProps<"/pla
 
       {fresh ? (
         <Card className="mb-6 border-ochre-200 bg-ochre-50/60 p-5">
-          <p className="mb-3 font-display text-lg font-semibold">{fmt(t.master.linkFor, { name: fresh.full_name })}</p>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <p className="font-display text-lg font-semibold">{fmt(t.master.linkFor, { name: fresh.full_name })}</p>
+            <Link href="/platform/team" className="shrink-0 text-[14px] font-semibold text-brand-600 hover:underline">
+              {t.common.done}
+            </Link>
+          </div>
           {share(fresh)}
         </Card>
       ) : null}

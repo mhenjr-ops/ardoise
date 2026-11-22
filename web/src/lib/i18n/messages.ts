@@ -32,6 +32,7 @@ const fr = {
     description: "Description",
     optional: "facultatif",
     saved: "Enregistré.",
+    done: "Terminé",
   },
   nav: {
     dashboard: "Tableau de bord",
@@ -50,6 +51,7 @@ const fr = {
     noAccount: "Pas encore de compte ?",
     haveAccount: "Déjà un compte ?",
     checkEmail: "Compte créé. Ouvrez le lien que nous venons de vous envoyer par e-mail pour terminer.",
+    accountExists: "Un compte existe déjà avec cet e-mail. Connectez-vous avec : votre invitation sera acceptée automatiquement.",
     invalid: "E-mail ou mot de passe incorrect.",
     weakPassword: "Le mot de passe doit contenir au moins 8 caractères.",
   },
@@ -405,6 +407,7 @@ const en: CoreMessages = {
     description: "Description",
     optional: "optional",
     saved: "Saved.",
+    done: "Done",
   },
   nav: {
     dashboard: "Dashboard",
@@ -423,6 +426,7 @@ const en: CoreMessages = {
     noAccount: "No account yet?",
     haveAccount: "Already have an account?",
     checkEmail: "Account created. Open the link we just emailed you to finish.",
+    accountExists: "An account already exists with this email. Sign in with it: your invitation will be accepted automatically.",
     invalid: "Wrong email or password.",
     weakPassword: "Password must be at least 8 characters.",
   },

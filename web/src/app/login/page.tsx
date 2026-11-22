@@ -41,10 +41,12 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           ? t.access.tooMany
           : params.error === "exists"
             ? t.errors.duplicate
+            : params.error === "account_exists"
+              ? t.auth.accountExists
             : params.error
               ? t.errors.generic
               : null;
-  const ok = params.ok === "check" ? t.auth.checkEmail : null;
+  const ok = params.ok === "check" || params.ok === "check_invite" ? t.auth.checkEmail : null;
 
 
   return (
@@ -129,7 +131,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
                 </Field>
               ) : (
                 <Field label={t.access.identifier} hint={t.access.identifierHelp}>
-                  <Input name="identifier" required autoComplete="username" autoCapitalize="none" />
+                  <Input name="identifier" required autoComplete="username" autoCapitalize="none" defaultValue={str("email")} />
                 </Field>
               )}
               <Field label={t.auth.password}>

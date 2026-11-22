@@ -40,7 +40,7 @@ type Invite = {
 };
 
 export default async function PeoplePage({ searchParams }: PageProps<"/admin/people">) {
-  const [{ supabase, institution, memberships: mine, user }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
+  const [{ supabase, institution, memberships: mine }, { t, locale }] = await Promise.all([requireInstitution(), getI18n()]);
   const params = await searchParams;
 
   const q = typeof params.q === "string" ? params.q.slice(0, 80) : "";
@@ -99,8 +99,8 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
     const str = sp.toString();
     return (str ? `/admin/people?${str}` : "/admin/people") as "/admin/people";
   };
-  // Just created: the newest open link this user made.
-  const fresh = params.created ? ((invites ?? []) as Invite[]).find((v) => v.created_by === user.id) : undefined;
+  // Just created: that link, until it's used or the card is closed.
+  const fresh = typeof params.created === "string" ? ((invites ?? []) as Invite[]).find((v) => v.id === params.created) : undefined;
 
   return (
     <div className="space-y-6">
@@ -108,12 +108,16 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
 
       {fresh ? (
         <Card className="border-ochre-200 bg-ochre-50/60 p-5">
-          <p className="font-display text-lg font-semibold">{fmt(t.staffing.linkReady, { role: t.roles[fresh.role] ?? fresh.role })}</p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-display text-lg font-semibold">{fmt(t.staffing.linkReady, { role: t.roles[fresh.role] ?? fresh.role })}</p>
+            <Link href="/admin/people" className="shrink-0 text-[14px] font-semibold text-brand-600 hover:underline">
+              {t.common.done}
+            </Link>
+          </div>
           <p className="mb-3 text-[14px] text-slate-600">{t.staffing.linkHelp}</p>
           <ShareLink
             url={`${origin}/join/${fresh.token}`}
-            message={fmt(t.share.message, { institution: institution.name, role: t.roles[fresh.role] ?? fresh.role })}
-            labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
+            labels={{ copy: t.share.copy, copied: t.share.copied }}
           />
         </Card>
       ) : null}
@@ -171,8 +175,7 @@ export default async function PeoplePage({ searchParams }: PageProps<"/admin/peo
                       <div className="min-w-0 flex-1">
                         <ShareLink
                           url={`${origin}/join/${v.token}`}
-                          message={fmt(t.share.message, { institution: institution.name, role: t.roles[v.role] })}
-                          labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
+                          labels={{ copy: t.share.copy, copied: t.share.copied }}
                         />
                       </div>
                       <form action={revokeInvitation}>

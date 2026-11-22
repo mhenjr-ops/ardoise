@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "@/lib/i18n/server";
-import { finishJoining, isInviteToken } from "@/lib/joining";
+import { acceptAnyInvitation, finishJoining, isInviteToken } from "@/lib/joining";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -40,6 +40,12 @@ export async function signIn(formData: FormData) {
   }
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) failed("invalid");
+  // Signing in from an invitation link accepts it straight away.
+  const token = next.startsWith("/join/") ? next.slice("/join/".length) : "";
+  if (isInviteToken(token)) {
+    const result = await acceptAnyInvitation(supabase, token);
+    redirect("to" in result ? result.to : `/join/${token}?error=${result.error}`);
+  }
   redirect(next);
 }
 
@@ -81,6 +87,11 @@ export async function signUp(formData: FormData) {
     },
   });
   if (error) again(error.message.toLowerCase().includes("already") ? "exists" : "generic");
+  // An email that already has an account comes back without an identity (and no email is
+  // sent): send the person to sign in with it instead, keeping where they were going.
+  if (data.user && (data.user.identities ?? []).length === 0) {
+    redirect(back("/login", { error: "account_exists", email, ...(next !== "/dashboard" ? { next } : {}) }));
+  }
   if (!data.session || !data.user) redirect(back("/login", { ok: invite ? "check_invite" : "check" }));
   redirect((await finishJoining(supabase, data.user)) ?? "/dashboard");
 }

@@ -90,8 +90,7 @@ export default async function StudentsPage({ searchParams }: PageProps<"/admin/s
         <p className="mb-3 text-[15px] text-slate-700">{t.roster.code}</p>
         <ShareLink
           url={`${await siteOrigin()}/join/${institution.slug}`}
-          message={fmt(t.share.studentMessage, { institution: institution.name })}
-          labels={{ copy: t.share.copy, copied: t.share.copied, whatsapp: t.share.whatsapp }}
+          labels={{ copy: t.share.copy, copied: t.share.copied }}
         />
       </Card>
 

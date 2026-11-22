@@ -11,7 +11,7 @@ const code = (message: string) =>
 export async function createInvitation(formData: FormData) {
   const role = field(formData, "role", 20);
   const { supabase } = await actionSession();
-  const { error } = await supabase.rpc("create_invitation", {
+  const { data: token, error } = await supabase.rpc("create_invitation", {
     p_institution: field(formData, "institution_id", 40),
     p_role: role,
     p_email: field(formData, "email", 320) || null,
@@ -20,9 +20,10 @@ export async function createInvitation(formData: FormData) {
     p_department: role === "hod" || role === "teacher" ? field(formData, "department_id", 40) || null : null,
   });
   if (error) redirect(`/admin/people?error=${code(error.message)}`);
+  // The page shows this one link (by id; the token never goes in the address bar).
+  const { data: made } = await supabase.from("invitations").select("id").eq("token", token as string).maybeSingle();
   revalidatePath("/admin/people");
-  // The page shows the newest link this user created; the token never goes in the address bar.
-  redirect("/admin/people?created=1");
+  redirect(made ? `/admin/people?created=${made.id}` : "/admin/people");
 }
 
 export async function revokeInvitation(formData: FormData) {
