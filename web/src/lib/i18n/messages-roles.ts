@@ -40,7 +40,7 @@ export const frRoles = {
   join: {
     title: "Vous êtes invité",
     body: "{institution} vous invite à rejoindre son espace Ardoise.",
-    as: "Rôle",
+    as: "Rôle\u00a0:",
     scope: "Périmètre",
     forEmail: "Cette invitation est réservée à {email}.",
     accept: "Accepter et continuer",
@@ -269,7 +269,7 @@ export const enRoles: RolesMessages = {
   join: {
     title: "You're invited",
     body: "{institution} invites you to join its Ardoise space.",
-    as: "Role",
+    as: "Role:",
     scope: "Scope",
     forEmail: "This invitation is for {email}.",
     accept: "Accept and continue",

@@ -75,7 +75,7 @@ export default async function JoinPage({ params, searchParams }: PageProps<"/joi
               <div>
                 <p className="font-display text-xl font-semibold">{v.institution}</p>
                 <p className="text-[15px] text-slate-600">
-                  {t.join.as} : <strong className="text-slate-900">{t.roles[v.role]}</strong>
+                  {t.join.as} <strong className="text-slate-900">{t.roles[v.role]}</strong>
                   {v.department ? ` · ${v.department}` : v.faculty ? ` · ${v.faculty}` : ""}
                 </p>
               </div>
