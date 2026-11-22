@@ -10,7 +10,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     { href: "/admin", label: t.lmd.nav.overview, show: can.manageStudents, exact: true },
     { href: "/admin/people", label: t.nav2.people, show: can.adminArea },
     { href: "/admin/students", label: t.nav2.students, show: can.manageStudents },
-    { href: "/admin/structure", label: t.lmd.nav.structure, show: can.manageSchool },
+    { href: "/admin/structure", label: t.lmd.nav.structure, show: can.adminArea },
     { href: "/admin/enrollments", label: t.lmd.nav.enrollments, show: can.manageStudents },
     { href: "/admin/deliberations", label: t.lmd.nav.deliberations, show: can.readResults },
     { href: "/admin/policy", label: t.lmd.nav.policy, show: can.runResults },

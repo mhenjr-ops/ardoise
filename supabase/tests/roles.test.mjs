@@ -52,13 +52,46 @@ await expectError('an admin cannot create another admin', () => invite('AD', 'ad
 await expectError('an admin cannot create an owner', () => invite('AD', 'owner'), 'forbidden');
 await join('R', await invite('AD', 'registrar'));
 
-const fac = (await one('AD', `insert into public.faculties (institution_id, name) values ($1, 'Sciences') returning id`, [inst])).id;
-const fac2 = (await one('AD', `insert into public.faculties (institution_id, name) values ($1, 'Lettres') returning id`, [inst])).id;
-const info = (await one('AD', `insert into public.departments (institution_id, faculty_id, name) values ($1, $2, 'Informatique') returning id`, [inst, fac])).id;
-const math = (await one('AD', `insert into public.departments (institution_id, faculty_id, name) values ($1, $2, 'Mathématiques') returning id`, [inst, fac])).id;
-const hist = (await one('AD', `insert into public.departments (institution_id, faculty_id, name) values ($1, $2, 'Histoire') returning id`, [inst, fac2])).id;
+// The structure is set up by the Ardoise team, not by the school.
+await expectError('the owner does not build the structure',
+  () => as('O', `insert into public.faculties (institution_id, name) values ($1, 'X')`, [inst]), 'row-level security');
 await expectError('the registrar does not edit the structure',
   () => as('R', `insert into public.faculties (institution_id, name) values ($1, 'X')`, [inst]), 'row-level security');
+await expectError('only the Ardoise team imports a structure',
+  () => as('O', `select public.import_structure($1, '[]'::jsonb)`, [inst]), 'forbidden');
+const imported = (await one('P', `select public.import_structure($1, $2::jsonb) as r`, [inst, JSON.stringify([
+  { name: 'Sciences', code: 'FS', departments: [{ name: 'Informatique' }, { name: 'Mathématiques', programmes: [{ name: 'Licence Maths', code: 'LMATH' }] }] },
+  { name: 'Lettres', departments: [{ name: 'Histoire' }] },
+  { name: 'HND Programmes', code: 'HND', kind: 'school', departments: [{ name: 'Higher National Diploma', programmes: [{ name: 'Civil Engineering', code: 'CVEN', cycle: 'hnd' }] }] },
+])])).r;
+check('the Ardoise team imports a whole structure at once', imported.units === 3 && imported.departments === 4 && imported.programmes === 2);
+const again = (await one('P', `select public.import_structure($1, $2::jsonb) as r`, [inst, JSON.stringify([
+  { name: 'FS', departments: [{ name: 'informatique' }, { name: 'Physique' }] },
+])])).r;
+check('importing again only adds what is missing (matched by code or name)', again.units === 0 && again.departments === 1 && again.programmes === 0);
+const fac = (await one('P', `select id from public.faculties where institution_id = $1 and code = 'FS'`, [inst])).id;
+const fac2 = (await one('P', `select id from public.faculties where institution_id = $1 and name = 'Lettres'`, [inst])).id;
+const info = (await one('P', `select id from public.departments where institution_id = $1 and name = 'Informatique'`, [inst])).id;
+const math = (await one('P', `select id from public.departments where institution_id = $1 and name = 'Mathématiques'`, [inst])).id;
+const hist = (await one('P', `select id from public.departments where institution_id = $1 and name = 'Histoire'`, [inst])).id;
+check('schools and colleges are told apart from faculties', (await one('P', `select kind from public.faculties where code = 'HND'`)).kind === 'school');
+check('HND programmes keep their cycle', (await one('P', `select cycle from public.programmes where code = 'CVEN'`)).cycle === 'hnd');
+check('members see their structure', (await count('R', `select count(*) n from public.departments where institution_id = $1`, [inst])) === 5);
+check('outsiders do not', (await count('Z', `select count(*) n from public.departments where institution_id = $1`, [inst])) === 0);
+
+const physique = (await one('P', `select id from public.departments where institution_id = $1 and name = 'Physique'`, [inst])).id;
+await expectError('a school cannot remove a department', () => as('O', `select public.remove_structure_item('department', $1)`, [physique]), 'forbidden');
+await as('P', `select public.remove_structure_item('department', $1)`, [physique]);
+check('the Ardoise team removes an empty department', (await count('P', `select count(*) n from public.departments where id = $1`, [physique])) === 0);
+await expectError('a department with programmes stays', () => as('P', `select public.remove_structure_item('department', $1)`, [math]), 'in_use');
+await expectError('a faculty with departments stays', () => as('P', `select public.remove_structure_item('unit', $1)`, [fac]), 'in_use');
+await as('O', `insert into public.support_requests (institution_id, body) values ($1, 'Please add a Department of Chemistry.')`, [inst]);
+await as('R', `insert into public.support_requests (institution_id, body) values ($1, 'Rename Licence Info.')`, [inst]);
+check('the Ardoise team sees the school\'s change requests', (await count('P', `select count(*) n from public.support_requests where institution_id = $1`, [inst])) === 2);
+check('the school office sees its own requests', (await count('AD', `select count(*) n from public.support_requests where institution_id = $1`, [inst])) === 2);
+check('outsiders see none', (await count('Z', `select count(*) n from public.support_requests`)) === 0);
+await expectError('a request cannot be marked done by the school',
+  () => as('O', `insert into public.support_requests (institution_id, body, handled_at) values ($1, 'x x x', now())`, [inst]), 'row-level security');
 
 await expectError('a dean needs a faculty', () => invite('AD', 'dean'), 'violates check constraint');
 await join('D', await invite('AD', 'dean', { faculty: fac }));
@@ -186,9 +219,9 @@ check('a student sees the staff', (await count('S1', `select count(*) n from pub
 check('staff see the students', (await count('T2', `select count(*) n from public.profiles where id = $1`, [ids.S3])) === 1);
 
 // --- Results belong to the registrar ----------------------------------------------------
-const prog = (await one('AD', `insert into public.programmes (institution_id, department_id, name) values ($1, $2, 'Licence Info') returning id`, [inst, info])).id;
-const year = (await one('R', `insert into public.academic_years (institution_id, label, starts_on, ends_on) values ($1, '2026-2027', '2026-10-01', '2027-07-31') returning id`, [inst])).id;
-const sem = (await one('R', `insert into public.semesters (institution_id, academic_year_id, label) values ($1, $2, 'S1') returning id`, [inst, year])).id;
+const prog = (await one('P', `insert into public.programmes (institution_id, department_id, name) values ($1, $2, 'Licence Info') returning id`, [inst, info])).id;
+const year = (await one('P', `insert into public.academic_years (institution_id, label, starts_on, ends_on) values ($1, '2026-2027', '2026-10-01', '2027-07-31') returning id`, [inst])).id;
+const sem = (await one('P', `insert into public.semesters (institution_id, academic_year_id, label) values ($1, $2, 'S1') returning id`, [inst, year])).id;
 await expectError('the admin cannot run deliberations',
   () => as('AD', `insert into public.deliberations (programme_id, semester_id, level) values ($1, $2, 'L1')`, [prog, sem]), 'row-level security');
 const delib = (await one('R', `insert into public.deliberations (programme_id, semester_id, level) values ($1, $2, 'L1') returning id`, [prog, sem])).id;

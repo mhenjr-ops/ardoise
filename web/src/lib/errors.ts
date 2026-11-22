@@ -11,6 +11,7 @@ const KNOWN = [
   "slug_taken",
   "invalid",
   "topic_locked",
+  "in_use",
 ];
 
 /** Turns a Supabase/Postgres error into one of the translated error codes. */

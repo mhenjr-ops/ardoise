@@ -1,7 +1,7 @@
 // Sprint 2 checks: quiz engine and LMD deliberation workflow.
 import { setup } from './harness.mjs';
 
-const { db, ids, as, check, expectError, done, fail, createSchool } = await setup(['A', 'T', 'S1', 'S2', 'X']);
+const { db, ids, as, check, expectError, done, fail, createSchool } = await setup(['A', 'T', 'S1', 'S2', 'X', 'P']);
 
 try {
   // ----- School, course, people -----
@@ -115,13 +115,16 @@ try {
   check('S2 cannot read S1 attempts', (await as('S2', `select id from public.quiz_attempts where student_id = $1`, [ids.S1])).rows.length === 0);
   await expectError('question used in an attempt cannot be deleted', () => as('T', `delete from public.questions where id = $1`, [q.single]), 'question_in_use');
 
-  // ----- LMD structure -----
-  const fac = (await as('A', `insert into public.faculties (institution_id, name) values ($1, 'Sciences') returning id`, [inst])).rows[0].id;
-  const dep = (await as('A', `insert into public.departments (institution_id, faculty_id, name) values ($1, $2, 'Informatique') returning id`, [inst, fac])).rows[0].id;
-  const prog = (await as('A', `insert into public.programmes (institution_id, department_id, name, code) values ($1, $2, 'Licence Informatique', 'LINF') returning id`, [inst, dep])).rows[0].id;
-  const year = (await as('A', `insert into public.academic_years (institution_id, label, is_current) values ($1, '2026-2027', true) returning id`, [inst])).rows[0].id;
-  const sem = (await as('A', `insert into public.semesters (institution_id, academic_year_id, label) values ($1, $2, 'S1') returning id`, [inst, year])).rows[0].id;
-  const ue1 = (await as('A', `insert into public.teaching_units (institution_id, programme_id, semester_id, code, title, credits, level) values ($1, $2, $3, 'UE11', 'Programmation', 6, 'L1') returning id`, [inst, prog, sem])).rows[0].id;
+  // ----- LMD structure (set up by the Ardoise team) -----
+  await db.query('insert into public.platform_admins (user_id) values ($1)', [ids.P]);
+  await expectError('a school owner cannot build the structure (the Ardoise team does)',
+    () => as('A', `insert into public.faculties (institution_id, name) values ($1, 'X')`, [inst]), 'row-level security');
+  const fac = (await as('P', `insert into public.faculties (institution_id, name) values ($1, 'Sciences') returning id`, [inst])).rows[0].id;
+  const dep = (await as('P', `insert into public.departments (institution_id, faculty_id, name) values ($1, $2, 'Informatique') returning id`, [inst, fac])).rows[0].id;
+  const prog = (await as('P', `insert into public.programmes (institution_id, department_id, name, code) values ($1, $2, 'Licence Informatique', 'LINF') returning id`, [inst, dep])).rows[0].id;
+  const year = (await as('P', `insert into public.academic_years (institution_id, label, is_current) values ($1, '2026-2027', true) returning id`, [inst])).rows[0].id;
+  const sem = (await as('P', `insert into public.semesters (institution_id, academic_year_id, label) values ($1, $2, 'S1') returning id`, [inst, year])).rows[0].id;
+  const ue1 = (await as('P', `insert into public.teaching_units (institution_id, programme_id, semester_id, code, title, credits, level) values ($1, $2, $3, 'UE11', 'Programmation', 6, 'L1') returning id`, [inst, prog, sem])).rows[0].id;
   await expectError('teacher cannot attach the course to a UE', () => as('T', `update public.courses set teaching_unit_id = $2 where id = $1`, [course, ue1]), 'forbidden');
   await expectError('teacher cannot change the coefficient', () => as('T', `update public.courses set coefficient = 3 where id = $1`, [course]), 'forbidden');
   await as('T', `update public.courses set description = 'ok' where id = $1`, [course]);
@@ -171,7 +174,7 @@ try {
   await expectError('teacher cannot issue transcripts', () => as('T', `insert into public.transcripts (deliberation_id, student_id, payload) values ($1, $2, '{}')`, [delib.id, ids.S2]));
 
   // Draft deliberations can be deleted with their results
-  const sem2 = (await as('A', `insert into public.semesters (institution_id, academic_year_id, label) values ($1, $2, 'S2') returning id`, [inst, year])).rows[0].id;
+  const sem2 = (await as('P', `insert into public.semesters (institution_id, academic_year_id, label) values ($1, $2, 'S2') returning id`, [inst, year])).rows[0].id;
   const d2 = (await as('A', `insert into public.deliberations (programme_id, semester_id, level) values ($1, $2, 'L1') returning id`, [prog, sem2])).rows[0].id;
   await as('A', `insert into public.deliberation_results (deliberation_id, student_id, decision) values ($1, $2, 'incomplete')`, [d2, ids.S1]);
   await as('A', `delete from public.deliberations where id = $1`, [d2]);
@@ -182,6 +185,8 @@ try {
   check('X sees no deliberations of demo', (await as('X', `select id from public.deliberations`)).rows.length === 0);
   await expectError('X cannot register students in demo', () => as('X', `select public.register_students($1, $2, 'L1', array['s1@demo.cm'])`, [prog, year]), 'forbidden');
   await expectError('X cannot hang a UE on demo programme', () => as('X', `insert into public.teaching_units (institution_id, programme_id, code, title, credits) values ($1, $2, 'HACK', 'x', 1)`, [instX, prog]), 'invalid');
+  await expectError('X cannot add teaching units even in its own school', () => as('X', `insert into public.teaching_units (institution_id, code, title, credits) values ($1, 'MINE', 'x', 1)`, [instX]), 'row-level security');
+  await expectError('even the Ardoise team cannot hang one school\'s UE on another school\'s programme', () => as('P', `insert into public.teaching_units (institution_id, programme_id, code, title, credits) values ($1, $2, 'HACK', 'x', 1)`, [instX, prog]), 'invalid');
   check('X has its own policy', (await as('X', `select institution_id from public.grading_policies`)).rows.every((r) => r.institution_id === instX));
 } catch (e) {
   console.log('UNEXPECTED ERROR:', e.message);

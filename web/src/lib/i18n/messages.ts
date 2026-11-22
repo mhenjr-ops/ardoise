@@ -273,7 +273,7 @@ const fr = {
     department: "Département",
     programme: "Filière",
     cycle: "Cycle",
-    cycles: { licence: "Licence", master: "Master", doctorat: "Doctorat", other: "Autre" },
+    cycles: { licence: "Licence", master: "Master", doctorat: "Doctorat", hnd: "HND", other: "Autre" },
     year: "Année académique",
     semester: "Semestre",
     current: "Année en cours",
@@ -345,6 +345,7 @@ const fr = {
   },
   errors: {
     generic: "Une erreur est survenue. Réessayez.",
+    in_use: "Encore utilisé : retirez d'abord ce qu'il contient.",
     user_not_found: "Aucun compte avec cette adresse e-mail.",
     forbidden: "Vous n'avez pas l'autorisation.",
     slug_taken: "Cet identifiant est déjà utilisé.",
@@ -642,7 +643,7 @@ const en: CoreMessages = {
     department: "Department",
     programme: "Programme",
     cycle: "Cycle",
-    cycles: { licence: "Bachelor (Licence)", master: "Master", doctorat: "Doctorate", other: "Other" },
+    cycles: { licence: "Bachelor (Licence)", master: "Master", doctorat: "Doctorate", hnd: "HND", other: "Other" },
     year: "Academic year",
     semester: "Semester",
     current: "Current year",
@@ -714,6 +715,7 @@ const en: CoreMessages = {
   },
   errors: {
     generic: "Something went wrong. Try again.",
+    in_use: "Still in use: remove what's inside it first.",
     user_not_found: "No account with that email address.",
     forbidden: "You don't have permission.",
     slug_taken: "That ID is already taken.",

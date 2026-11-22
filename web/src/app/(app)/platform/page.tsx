@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Building2, Mail, Phone } from "lucide-react";
 import { getSession } from "@/lib/session";
@@ -8,6 +9,7 @@ import { siteOrigin } from "@/lib/site";
 import { Badge, Button, Card, CardHeader, Empty, Field, Flash, Input, PageHeader, Select } from "@/components/ui";
 import { ShareLink } from "@/components/copy-button";
 import { createSchool, markRequestHandled } from "./actions";
+import { markSupportDone } from "./[slug]/actions";
 
 type Request = {
   id: string;
@@ -28,7 +30,7 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
   if (!isPlatformAdmin) notFound();
   const params = await searchParams;
 
-  const [{ data: requests }, { data: schools }, { data: links }, origin] = await Promise.all([
+  const [{ data: requests }, { data: schools }, { data: links }, { data: changes }, origin] = await Promise.all([
     supabase.from("demo_requests").select("*").order("handled_at", { ascending: true, nullsFirst: true }).order("created_at", { ascending: false }).limit(100),
     supabase.from("institutions").select("id, name, slug, default_locale, created_at").order("created_at", { ascending: false }),
     supabase
@@ -40,8 +42,23 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
       .is("revoked_at", null)
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false }),
+    supabase
+      .from("support_requests")
+      .select("id, body, created_at, institution:institutions(name, slug), author:profiles!support_requests_created_by_fkey(full_name, email)")
+      .is("handled_at", null)
+      .order("created_at", { ascending: true })
+      .limit(50),
     siteOrigin(),
   ]);
+  type Change = {
+    id: string;
+    body: string;
+    created_at: string;
+    institution: { name: string; slug: string } | { name: string; slug: string }[] | null;
+    author: { full_name: string; email: string } | { full_name: string; email: string }[] | null;
+  };
+  const one = <T,>(v: T | T[] | null) => (Array.isArray(v) ? v[0] : v);
+  const changeList = (changes ?? []) as Change[];
   const schoolName = new Map(((schools ?? []) as Array<{ id: string; name: string }>).map((s) => [s.id, s.name]));
   const ownerLinks = ((links ?? []) as Array<{ id: string; token: string; institution_id: string }>).map((l) => ({
     ...l,
@@ -124,6 +141,39 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
         </Card>
 
         <div className="space-y-6">
+          <Card id="requests" className="scroll-mt-6">
+            <CardHeader title={t.structure.changeRequests} />
+            {changeList.length ? (
+              <ul className="divide-y divide-slate-100">
+                {changeList.map((c) => {
+                  const school = one(c.institution);
+                  const author = one(c.author);
+                  return (
+                    <li key={c.id} className="space-y-1.5 px-5 py-3.5">
+                      <Link href={`/platform/${school?.slug ?? ""}`} className="text-[14px] font-semibold text-brand-600 hover:underline">
+                        {school?.name}
+                      </Link>
+                      <p className="whitespace-pre-line text-[14.5px] text-slate-800">{c.body}</p>
+                      <p className="text-[12.5px] text-slate-500">
+                        {author?.full_name || author?.email} · {formatDate(locale, c.created_at)}
+                      </p>
+                      <form action={markSupportDone}>
+                        <input type="hidden" name="back" value="/platform" />
+                        <input type="hidden" name="slug" value={school?.slug ?? ""} />
+                        <input type="hidden" name="id" value={c.id} />
+                        <Button type="submit" size="sm" variant="secondary">
+                          {t.structure.markDone}
+                        </Button>
+                      </form>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="px-5 py-4 text-[14px] text-slate-500">{t.structure.noChangeRequests}</p>
+            )}
+          </Card>
+
           <Card className="p-5">
             <h2 className="font-display text-xl font-semibold">{t.platform.newSchool}</h2>
             <p className="mb-4 mt-1 text-[14px] text-slate-600">{t.platform.newSchoolBody}</p>
@@ -154,14 +204,17 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
             <CardHeader title={t.platform.schools} />
             <ul className="divide-y divide-slate-100">
               {((schools ?? []) as Array<{ id: string; name: string; slug: string; default_locale: string; created_at: string }>).map((s) => (
-                <li key={s.id} className="flex items-center gap-3 px-5 py-3">
-                  <Building2 size={17} className="shrink-0 text-brand-500" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-slate-900">{s.name}</p>
-                    <p className="text-[13px] text-slate-500">
-                      /join/{s.slug} · {s.default_locale.toUpperCase()} · {formatDate(locale, s.created_at)}
-                    </p>
-                  </div>
+                <li key={s.id}>
+                  <Link href={`/platform/${s.slug}`} className="flex items-center gap-3 px-5 py-3 hover:bg-sand/60">
+                    <Building2 size={17} className="shrink-0 text-brand-500" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-slate-900">{s.name}</p>
+                      <p className="text-[13px] text-slate-500">
+                        /join/{s.slug} · {s.default_locale.toUpperCase()} · {formatDate(locale, s.created_at)}
+                      </p>
+                    </div>
+                    <span className="text-[13px] font-semibold text-brand-600">{t.structure.openSchool}</span>
+                  </Link>
                 </li>
               ))}
             </ul>
