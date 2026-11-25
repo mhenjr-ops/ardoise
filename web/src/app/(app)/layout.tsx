@@ -3,6 +3,7 @@ import {
   CalendarDays,
   GraduationCap,
   Inbox,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   MessageSquareText,
@@ -132,6 +133,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <p className="truncate text-[14px] font-semibold">{displayName}</p>
             <p className="truncate text-[12.5px] text-chalk/55">{roleLabel}</p>
           </div>
+          <Link
+            href="/security"
+            title={t.security.link}
+            className="grid h-9 w-9 place-items-center rounded-full text-chalk/70 hover:bg-white/10 hover:text-chalk"
+          >
+            <KeyRound size={17} aria-hidden />
+            <span className="sr-only">{t.security.link}</span>
+          </Link>
           <form action={signOut}>
             <button
               type="submit"
@@ -170,6 +179,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             tone="dark"
           />
           <LocaleSwitch locale={locale} dark />
+          <Link href="/security" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" aria-label={t.security.link}>
+            <KeyRound size={18} aria-hidden />
+          </Link>
           <form action={signOut}>
             <button type="submit" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10" aria-label={t.common.signOut}>
               <LogOut size={18} aria-hidden />

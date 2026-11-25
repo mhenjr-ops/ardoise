@@ -8,8 +8,10 @@ create role authenticated nologin;
 create schema auth;
 create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb, last_sign_in_at timestamptz);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
+create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, factor_type text default 'totp', status text);
 grant usage on schema auth to authenticated, anon;
-grant execute on function auth.uid() to authenticated, anon;
+grant execute on function auth.uid(), auth.jwt() to authenticated, anon;
 create schema storage;
 create table storage.buckets (id text primary key, name text, public boolean);
 create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid);
@@ -46,9 +48,17 @@ export async function setup(userKeys) {
   }
 
   let failures = 0;
+  // Sessions are "aal2" (two-step login passed) unless a test says otherwise with setAal.
+  let aal = 'aal2';
+  const setAal = (v) => {
+    aal = v;
+  };
   async function as(user, sql, params = [], role = 'authenticated') {
     await db.exec('reset role');
     await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [user ? ids[user] : '']);
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [
+      user ? JSON.stringify({ sub: ids[user], role, aal }) : '',
+    ]);
     await db.exec(`set role ${role}`);
     try {
       return await db.query(sql, params);
@@ -86,5 +96,5 @@ export async function setup(userKeys) {
     console.log(failures === 0 ? '\nALL CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);
     process.exit(failures ? 1 : 0);
   }
-  return { db, ids, as, check, expectError, done, createSchool, fail: () => failures++ };
+  return { db, ids, as, setAal, check, expectError, done, createSchool, fail: () => failures++ };
 }

@@ -52,13 +52,19 @@ export const getSession = cache(async () => {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: memberships }] = await Promise.all([
+  const [{ data: status }, { data: profile }, { data: memberships }] = await Promise.all([
+    supabase.rpc("account_status"),
     supabase.from("profiles").select("id, email, full_name, locale").eq("id", user.id).maybeSingle(),
     supabase
       .from("memberships")
       .select("id, role, faculty_id, department_id, institution:institutions(id, name, slug, default_locale, grading_system)")
       .eq("user_id", user.id),
   ]);
+  // Two-step login: the code first if it is on; set it up first if this account must have it.
+  // (The database enforces both; this sends people where they can fix it.)
+  const security = status as { aal?: string; has_mfa?: boolean; mfa_required?: boolean } | null;
+  if (security?.has_mfa && security.aal !== "aal2") redirect("/login/verify");
+  if (security?.mfa_required && !security.has_mfa) redirect("/security");
   const { data: platform } = await supabase.from("platform_admins").select("user_id").eq("user_id", user.id).maybeSingle();
 
   // The Ardoise team account is the master view of every university, never a member of one.

@@ -1,0 +1,3 @@
+confirmation: Confirm your Ardoise account · Confirmez votre compte Ardoise
+recovery: Reset your Ardoise password · Réinitialisez votre mot de passe Ardoise
+email_change: Confirm your new email · Confirmez votre nouvel e-mail

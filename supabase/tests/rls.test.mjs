@@ -13,8 +13,11 @@ create role authenticated nologin;
 create schema auth;
 create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb default '{}'::jsonb);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+-- These tests are about who sees what; two-step login is tested in roles.test.mjs, so every session here has passed it.
+create function auth.jwt() returns jsonb language sql stable as $$ select '{"aal": "aal2"}'::jsonb $$;
+create table auth.mfa_factors (id uuid primary key default gen_random_uuid(), user_id uuid, factor_type text default 'totp', status text);
 grant usage on schema auth to authenticated;
-grant execute on function auth.uid() to authenticated;
+grant execute on function auth.uid(), auth.jwt() to authenticated;
 create schema storage;
 create table storage.buckets (id text primary key, name text, public boolean);
 create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid);

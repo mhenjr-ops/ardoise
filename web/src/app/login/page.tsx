@@ -9,7 +9,9 @@ import { Button, Field, Flash, Input, Select } from "@/components/ui";
 import { LocaleSwitch } from "@/components/locale-switch";
 import { Wordmark } from "@/components/brand";
 import { ChalkMotif } from "@/components/chalk-motif";
-import { signIn, signUp } from "./actions";
+import { googleEnabled } from "@/lib/auth-flow";
+import { GoogleMark } from "@/components/google-mark";
+import { resendConfirmation, signIn, signInWithGoogle, signUp } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -30,24 +32,35 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const schools = isSignup && !invited ? await schoolDirectory(await createClient()) : [];
   const fixed = schools.find((s) => s.slug === str("school")) ?? null;
   const picked = str("pick");
+  const errorKey = typeof params.error === "string" ? params.error : "";
   const error =
-    params.error === "invalid"
+    errorKey === "invalid"
       ? isSignup
         ? t.errors.invalid
         : t.access.invalid
-      : params.error === "weak"
+      : errorKey === "weak"
         ? t.auth.weakPassword
-        : params.error === "too_many"
+        : errorKey === "too_many"
           ? t.access.tooMany
-          : params.error === "exists"
+          : errorKey === "exists"
             ? t.errors.duplicate
-            : params.error === "account_exists"
+            : errorKey === "account_exists"
               ? t.auth.accountExists
-            : params.error
-              ? t.errors.generic
-              : null;
-  const ok = params.ok === "check" || params.ok === "check_invite" ? t.auth.checkEmail : null;
-
+              : errorKey === "unconfirmed"
+                ? t.auth.unconfirmed
+                : errorKey === "email_limit"
+                  ? t.auth.emailLimit
+                  : errorKey === "link_expired"
+                    ? t.auth.linkExpired
+                    : errorKey === "google"
+                      ? t.auth.googleFailed
+                      : errorKey
+                        ? t.errors.generic
+                        : null;
+  const ok = params.ok === "check" || params.ok === "check_invite" ? t.auth.checkEmail : params.ok === "resent" ? t.auth.resent : null;
+  // Waiting for the confirmation email: offer to send it again.
+  const resendTo = (errorKey === "unconfirmed" || params.ok === "check" || params.ok === "check_invite") && str("email") ? str("email") : "";
+  const google = await googleEnabled();
 
   return (
     <main className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
@@ -82,6 +95,30 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
               {isSignup && !invited ? t.access.studentSignUpIntro : t.auth.tagline}
             </p>
             <Flash error={error} ok={ok} />
+            {resendTo ? (
+              <form action={resendConfirmation} className="-mt-2 mb-5">
+                <input type="hidden" name="email" value={resendTo} />
+                {next ? <input type="hidden" name="next" value={next} /> : null}
+                <button type="submit" className="text-[14px] font-semibold text-brand-600 hover:underline">
+                  {t.auth.resend}
+                </button>
+              </form>
+            ) : null}
+
+            {google ? (
+              <>
+                <form action={signInWithGoogle}>
+                  {next ? <input type="hidden" name="next" value={next} /> : null}
+                  <Button type="submit" variant="secondary" size="lg" className="w-full">
+                    <GoogleMark />
+                    {t.auth.google}
+                  </Button>
+                </form>
+                <p className="my-5 flex items-center gap-3 text-[13px] text-slate-400 before:h-px before:flex-1 before:bg-slate-200 after:h-px after:flex-1 after:bg-slate-200">
+                  {t.auth.or}
+                </p>
+              </>
+            ) : null}
 
             <form action={isSignup ? signUp : signIn} className="space-y-4">
               {next ? <input type="hidden" name="next" value={next} /> : null}
@@ -143,6 +180,13 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
                   autoComplete={isSignup ? "new-password" : "current-password"}
                 />
               </Field>
+              {!isSignup ? (
+                <p className="-mt-1 text-right">
+                  <Link href="/login/forgot" className="text-[14px] font-semibold text-brand-600 hover:underline">
+                    {t.auth.forgot}
+                  </Link>
+                </p>
+              ) : null}
               <Button type="submit" size="lg" className="w-full">
                 {isSignup ? t.auth.signUp : t.auth.signIn}
               </Button>

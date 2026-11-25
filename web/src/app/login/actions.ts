@@ -1,19 +1,14 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "@/lib/i18n/server";
-import { acceptAnyInvitation, finishJoining, isInviteToken } from "@/lib/joining";
+import { finishJoining, isInviteToken } from "@/lib/joining";
+import { authErrorCode, needsCode, safePath, signInTarget } from "@/lib/auth-flow";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
-}
-
-/** Only same-site paths are allowed as a destination after signing in. */
-function safeNext(value: FormDataEntryValue | null): string {
-  const s = String(value ?? "");
-  return s.startsWith("/") && !s.startsWith("//") && !s.startsWith("/\\") ? s : "/dashboard";
 }
 
 function back(path: string, params: Record<string, string>) {
@@ -21,13 +16,19 @@ function back(path: string, params: Record<string, string>) {
   return `${path}?${q.toString()}`;
 }
 
+async function origin() {
+  return (await headers()).get("origin") ?? "";
+}
+
 /** Email or matricule + password. A matricule is exchanged for the account's email only
  *  when the password is right (see login_email in the database). */
 export async function signIn(formData: FormData) {
   const identifier = text(formData, "identifier");
   const password = String(formData.get("password") ?? "");
-  const next = safeNext(formData.get("next"));
-  const failed = (error: string): never => redirect(back("/login", { error, ...(next !== "/dashboard" ? { next } : {}) }));
+  const next = safePath(formData.get("next"));
+  const keepNext: Record<string, string> = next !== "/dashboard" ? { next } : {};
+  const failed = (error: string, extra: Record<string, string> = {}): never =>
+    redirect(back("/login", { error, ...keepNext, ...extra }));
   if (!identifier || !password) failed("invalid");
 
   const supabase = await createClient();
@@ -39,14 +40,29 @@ export async function signIn(formData: FormData) {
     email = data as string;
   }
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) failed("invalid");
-  // Signing in from an invitation link accepts it straight away.
-  const token = next.startsWith("/join/") ? next.slice("/join/".length) : "";
-  if (isInviteToken(token)) {
-    const result = await acceptAnyInvitation(supabase, token);
-    redirect("to" in result ? result.to : `/join/${token}?error=${result.error}`);
+  if (error) {
+    const code = authErrorCode(error);
+    failed(code === "unconfirmed" ? "unconfirmed" : "invalid", code === "unconfirmed" ? { email } : {});
   }
-  redirect(next);
+  // The two-step code if the account has it on, then the invitation it came from, if any.
+  redirect(await signInTarget(supabase, next));
+}
+
+/** Google sign-in. Where the person was going is kept in a short-lived cookie, so it survives
+ *  the trip to Google even if the return address is cut down to the home page. */
+export async function signInWithGoogle(formData: FormData) {
+  const next = safePath(formData.get("next"));
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${await origin()}/auth/callback?next=${encodeURIComponent(next)}`,
+      queryParams: { prompt: "select_account" },
+    },
+  });
+  if (error || !data.url) redirect(back("/login", { error: "google" }));
+  (await cookies()).set("ardoise_next", next, { httpOnly: true, sameSite: "lax", secure: true, maxAge: 600, path: "/" });
+  redirect(data.url);
 }
 
 /** Students sign up with their university (picked from the list or set by the school's
@@ -60,7 +76,7 @@ export async function signUp(formData: FormData) {
   const school = text(formData, "school").toLowerCase().slice(0, 60);
   const fromLink = formData.get("from_link") === "1";
   const matricule = text(formData, "matricule").toUpperCase().slice(0, 40);
-  const next = safeNext(formData.get("next"));
+  const next = safePath(formData.get("next"));
   const invite = next.startsWith("/join/") ? next.slice("/join/".length) : "";
   const again = (error: string): never =>
     redirect(
@@ -75,7 +91,6 @@ export async function signUp(formData: FormData) {
   if (!email || fullName.length < 2) again("invalid");
   if (invite ? !isInviteToken(invite) : !school || matricule.length < 2) again("invalid");
 
-  const origin = (await headers()).get("origin") ?? "";
   const locale = await getLocale();
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -83,17 +98,80 @@ export async function signUp(formData: FormData) {
     password,
     options: {
       data: { full_name: fullName, locale, ...(invite ? { invite } : { school_code: school, matricule }) },
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: `${await origin()}/auth/callback`,
     },
   });
-  if (error) again(error.message.toLowerCase().includes("already") ? "exists" : "generic");
+  if (error) {
+    const code = authErrorCode(error);
+    again(code === "email_limit" || code === "weak" ? code : error.message.toLowerCase().includes("already") ? "exists" : "generic");
+  }
   // An email that already has an account comes back without an identity (and no email is
   // sent): send the person to sign in with it instead, keeping where they were going.
   if (data.user && (data.user.identities ?? []).length === 0) {
     redirect(back("/login", { error: "account_exists", email, ...(next !== "/dashboard" ? { next } : {}) }));
   }
-  if (!data.session || !data.user) redirect(back("/login", { ok: invite ? "check_invite" : "check" }));
+  if (!data.session || !data.user) redirect(back("/login", { ok: invite ? "check_invite" : "check", email }));
   redirect((await finishJoining(supabase, data.user)) ?? "/dashboard");
+}
+
+/** Sends the confirmation email again (never says whether the address has an account). */
+export async function resendConfirmation(formData: FormData) {
+  const email = text(formData, "email").slice(0, 320);
+  const next = safePath(formData.get("next"));
+  const keepNext: Record<string, string> = next !== "/dashboard" ? { next } : {};
+  if (!email.includes("@")) redirect(back("/login", { error: "invalid", ...keepNext }));
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: `${await origin()}/auth/callback` } });
+  if (error && authErrorCode(error) === "email_limit") redirect(back("/login", { error: "email_limit", email, ...keepNext }));
+  redirect(back("/login", { ok: "resent", email, ...keepNext }));
+}
+
+/** Forgot password: a link to choose a new one (never says whether the address has an account). */
+export async function requestReset(formData: FormData) {
+  const email = text(formData, "email").slice(0, 320);
+  if (!email.includes("@")) redirect(back("/login/forgot", { error: "invalid" }));
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${await origin()}/auth/callback` });
+  if (error && authErrorCode(error) === "email_limit") redirect(back("/login/forgot", { error: "email_limit", email }));
+  redirect(back("/login/forgot", { sent: "1", email }));
+}
+
+/** New password, from the reset link (or from Security while signed in). Other devices are signed out. */
+export async function updatePassword(formData: FormData) {
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+  const from = formData.get("from") === "security" ? "/security" : "/login/reset";
+  if (password.length < 8) redirect(back(from, { error: "weak" }));
+  if (password !== confirm) redirect(back(from, { error: "mismatch" }));
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect(back("/login/forgot", { error: "link_expired" }));
+  // With two-step login on, a reset link alone is not enough: the code comes first.
+  if (await needsCode(supabase)) redirect(`/login/verify?next=${encodeURIComponent(from)}`);
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    const code = authErrorCode(error);
+    redirect(back(from, { error: code === "same_password" || code === "weak" ? code : "generic" }));
+  }
+  await supabase.auth.signOut({ scope: "others" });
+  redirect(back("/security", { ok: "password" }));
+}
+
+/** The 6-digit code from the authenticator app. */
+export async function verifyCode(formData: FormData) {
+  const code = text(formData, "code").replace(/\s/g, "");
+  const next = safePath(formData.get("next"));
+  const again = (error: string): never => redirect(back("/login/verify", { error, ...(next !== "/dashboard" ? { next } : {}) }));
+  if (!/^\d{6}$/.test(code)) again("code");
+  const supabase = await createClient();
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const factor = factors?.totp.find((f) => f.status === "verified");
+  if (!factor) redirect("/login");
+  const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
+  if (error) again(authErrorCode(error) === "email_limit" ? "too_many" : "code");
+  redirect(await signInTarget(supabase, next));
 }
 
 export async function demoSignIn(formData: FormData) {

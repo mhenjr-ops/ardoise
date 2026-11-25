@@ -2,7 +2,7 @@
 // oversight, the student list, matricule claims and matricule sign-in.
 import { setup } from './harness.mjs';
 
-const { db, ids, as, check, expectError, done } = await setup([
+const { db, ids, as, setAal, check, expectError, done } = await setup([
   'P', 'O', 'AD', 'R', 'D', 'H', 'H2', 'T', 'T2', 'S1', 'S2', 'S3', 'S4', 'Z', 'Q1', 'Q2',
 ]);
 const one = async (user, sql, params) => (await as(user, sql, params)).rows[0];
@@ -376,5 +376,48 @@ await as('P', `select public.remove_teammate($1)`, [ids.Q1]);
 check('removing a manager moves their people up a level',
   (await one('P', `select reports_to from public.platform_team() where user_id = $1`, [ids.Q2])).reports_to === ids.P);
 check('a removed teammate reads no team messages', (await count('Q1', `select count(*) n from public.team_messages`)) === 0);
+
+// --- Two-step login, enforced by the database ------------------------------------------------
+const status = async (user) => (await one(user, `select public.account_status() as s`)).s;
+const tTeaches = await count('T', `select count(*) n from public.enrollments where user_id = $1`, [ids.T]);
+const tCourse = (await one('T', `select course_id from public.enrollments where user_id = $1 and role = 'teacher' limit 1`, [ids.T])).course_id;
+setAal('aal1'); // password only, no code entered
+check('a teacher without two-step login works as before',
+  tTeaches > 0 && (await count('T', `select count(*) n from public.enrollments where user_id = $1`, [ids.T])) === tTeaches);
+const adStatus = await status('AD');
+check('an administrator must turn two-step login on', adStatus.mfa_required === true && adStatus.has_mfa === false && adStatus.aal === 'aal1');
+check('…and until then the database gives them nothing',
+  (await count('AD', `select count(*) n from public.memberships where institution_id = $1`, [inst])) === 0);
+await expectError('…not even through a function', () => as('AD', `select * from public.admin_staff($1)`, [inst]), 'forbidden');
+check('so does a registrar', (await status('R')).mfa_required === true);
+await expectError('the Ardoise team needs it too', () => as('P', `select * from public.platform_schools()`), 'forbidden');
+check('a student does not have to', (await status('S1')).mfa_required === false);
+
+await db.query(`insert into auth.mfa_factors (user_id, status) values ($1, 'verified')`, [ids.T]);
+const tStatus = await status('T');
+check('someone who turned it on is told to enter their code', tStatus.has_mfa === true && tStatus.aal === 'aal1');
+check('…and with the password alone reads nothing', (await count('T', `select count(*) n from public.enrollments`)) === 0);
+await expectError('…and changes nothing',
+  () => as('T', `insert into public.announcements (course_id, author_id, title, body) values ($1, $2, 'x', 'x')`, [tCourse, ids.T]),
+  'row-level security');
+setAal('aal2');
+check('with the code entered, everything is back', (await count('T', `select count(*) n from public.enrollments where user_id = $1`, [ids.T])) === tTeaches);
+check('an administrator who entered their code works', (await count('AD', `select count(*) n from public.memberships where institution_id = $1`, [inst])) > 0);
+await db.query(`delete from auth.mfa_factors where user_id = $1`, [ids.T]);
+
+setAal('aal1');
+await db.query(`update auth.users set email = 'r@demo.ardoise.cm' where id = $1`, [ids.R]);
+check('demo accounts (shared presentation passwords) are exempt', (await status('R')).mfa_required === false
+  && (await count('R', `select count(*) n from public.memberships where institution_id = $1`, [inst])) > 0);
+await db.query(`update auth.users set email = 'r@demo.cm' where id = $1`, [ids.R]);
+check('signed-out visitors still find their university', (await as(null, `select count(*) n from public.school_directory()`, [], 'anon')).rows[0].n > 0);
+setAal('aal2');
+
+const unguarded = (await db.query(`
+  select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
+    and not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname
+                    and p.policyname = 'two_step' and p.permissive = 'RESTRICTIVE')`)).rows.map((r) => r.relname);
+check(`every table requires two-step login where it is on${unguarded.length ? ` (missing: ${unguarded.join(', ')})` : ''}`, unguarded.length === 0);
 
 done();

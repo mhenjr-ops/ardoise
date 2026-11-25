@@ -75,9 +75,11 @@ The defaults (pass 10/20, compensation on, CC 30 / TP 20 / exam 50, jury bonus u
 2. **SQL Editor**: run every file in `supabase/migrations/` in filename order (or `supabase link` then `supabase db push`).
 3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`, then `supabase/seed/demo-roles.sql`. For presentations, `supabase/seed/uba.sql` loads the University of Bamenda's faculties, schools, departments and programmes, and `supabase/seed/uba-demo.sql` adds the university's administrator, a lecturer teaching in three departments and a student with a full load (with classmates, timetable and first week of work). It needs the password for those three accounts first, so it is never in the repository: `select set_config('ardoise.demo_password', '…', false);` then run the file.
 4. Give the Ardoise team access to the console: sign up once on the web app, then in the SQL Editor run `insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';`
-5. **Authentication → URL Configuration**: Site URL = your web address (e.g. `https://ardoise-pi.vercel.app`); add `<site>/auth/callback` to Redirect URLs. Without this, sign-up and password emails point to localhost.
-6. **Authentication → Emails**: sign-up sends a confirmation email. The built-in sender is rate-limited; set up your own SMTP sender (Resend, Brevo…) before real students sign up.
-7. Copy the project URL and publishable (or anon) key from **Settings → API**.
+5. **Authentication → URL Configuration**: Site URL = your web address (e.g. `https://ardoise-pi.vercel.app`); add `<site>/**` to Redirect URLs. Without this, sign-up and password emails point to localhost.
+6. **Emails**: the built-in sender is for testing only (a handful of emails an hour, often spam). Before real students sign up, follow `supabase/templates/README.md`: your own sender (SMTP), a higher hourly limit, and Ardoise's bilingual templates, whose links work on any device.
+7. **Two-step login** (authenticator-app codes) is on by default on Supabase projects; nothing to switch on. It is required, by the database, for the Ardoise team, owners, administrators and registrars (demo accounts excepted). Lost phone: in the SQL Editor, `delete from auth.mfa_factors where user_id = (select id from auth.users where email = '…');` then the person sets it up again.
+8. **Google sign-in** (optional): create an OAuth client in Google Cloud (type "Web application", authorised redirect URI `https://<project>.supabase.co/auth/v1/callback`), then **Authentication → Sign In / Providers → Google**: paste the client ID and secret and switch it on. The "Continue with Google" button appears on its own within 5 minutes.
+9. Copy the project URL and publishable (or anon) key from **Settings → API**.
 
 ## 2. Web app
 
@@ -113,7 +115,13 @@ npx expo start                 # scan with Expo Go
 
 **Browser preview** (what runs at `/app`): `./scripts/export-web.sh` with the same `EXPO_PUBLIC_*` values builds the app for the browser and copies it to `web/public/app`; commit and deploy the web app.
 
-Store builds go through EAS (`npx eas-cli@latest build`), configured in `app.json`.
+The app is for students and lecturers: sign in with email or matricule, sign up with university and matricule, forgot password (opens the web page), the two-step code for accounts that have it on. Office and Ardoise team accounts are told to use the website.
+
+**Google Play** (settings in `eas.json`; versions are counted by Expo):
+1. Accounts: an Expo account, and a Google Play developer account ($25, once). In Play Console, **Create app** with package `cm.ardoise.app`.
+2. The app's public settings, once per environment: `npx eas-cli@latest env:create --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value …` (same for `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `EXPO_PUBLIC_WEB_URL`; `--environment preview` for test builds).
+3. A test build to install on phones: `npx eas-cli@latest build -p android --profile preview` (an APK link to share).
+4. The store build and upload: `npx eas-cli@latest build -p android --profile production`, then `npx eas-cli@latest submit -p android --profile production` (needs a Google service-account key, added once with `npx eas-cli@latest credentials`). It lands as a draft on the internal testing track; promote it in Play Console.
 
 ## Checks
 
@@ -133,9 +141,9 @@ Not yet done: a run on a physical Android phone.
 - Notifications are in-app only; push, SMS and WhatsApp come next.
 - Multiple-choice questions are all-or-nothing; editing an answer key doesn't re-mark past attempts.
 - PDFs use the standard Latin-1 fonts: French accents work, other scripts are replaced.
-- The phone app doesn't know the new roles or matricule sign-in yet (paused while the web workflow settles).
-- Student-list import takes Excel/CSV; reading the registration portal's Form B directly comes next.
-- Still to come: Google sign-in, two-step sign-in, per-school branding, mobile-money billing, iOS build, offline course downloads.
+- Student-list import takes Excel/CSV from any registration system. A reader for the University of Bamenda's own Form B (its portal only) can come later.
+- Two-step login uses authenticator apps; SMS codes and backup codes come next. A lost phone is reset by the Ardoise team in the database.
+- Still to come: per-school branding, mobile-money billing, iOS build, offline course downloads.
 
 ## Decisions
 

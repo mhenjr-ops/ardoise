@@ -8,10 +8,11 @@ import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 
 export default function TabsLayout() {
-  const { session, loading } = useAuth();
+  const { session, loading, gate } = useAuth();
   const { t } = useI18n();
-  if (loading) return <Loading />;
-  if (!session) return <Redirect href="/login" />;
+  if (loading || (session && gate === null)) return <Loading />;
+  // Signed out, or a step left before this account can use the app: the sign-in screen handles both.
+  if (!session || gate !== 'ready') return <Redirect href="/login" />;
 
   return (
     <Tabs

@@ -1,10 +1,11 @@
-import { Redirect } from 'expo-router';
+import { Link, Redirect } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LogoMark, NdopPattern } from '@/components/ndop';
 import { Text } from '@/components/text';
-import { Button, Input, colors, fonts } from '@/components/ui';
+import { Button, Input, Loading, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useI18n } from '@/lib/i18n';
 import { isConfigured, supabase } from '@/lib/supabase';
@@ -14,15 +15,18 @@ const WEB_URL = process.env.EXPO_PUBLIC_WEB_URL ?? '';
 const DEMO = process.env.EXPO_PUBLIC_DEMO === 'on' && WEB_URL.startsWith('http');
 
 export default function LoginScreen() {
-  const { session } = useAuth();
+  const { session, gate, refreshGate, signOut } = useAuth();
   const { t, locale, setLocale } = useI18n();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
   const [demoBusy, setDemoBusy] = useState<'student' | 'teacher' | null>(null);
 
-  if (session) return <Redirect href="/" />;
+  if (session && gate === 'ready') return <Redirect href="/" />;
 
   async function demo(role: 'student' | 'teacher') {
     setError(null);
@@ -44,13 +48,69 @@ export default function LoginScreen() {
     }
   }
 
+  /** Email or matricule + password; a matricule is swapped for the account's email only when the password is right. */
   async function onSubmit() {
     setError(null);
+    setNotice(null);
+    setUnconfirmed(null);
     setBusy(true);
-    const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    setBusy(false);
-    if (authError) setError(t.invalidLogin);
+    try {
+      const id = identifier.trim();
+      let email = id;
+      if (!id.includes('@')) {
+        const { data, error: e } = await supabase.rpc('login_email', { p_matricule: id, p_password: password });
+        if (e || !data) {
+          setError(t.invalidLogin);
+          return;
+        }
+        email = data as string;
+      }
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) {
+        if (authError.code === 'email_not_confirmed') {
+          setUnconfirmed(email);
+          setError(t.unconfirmed);
+        } else setError(t.invalidLogin);
+      }
+    } finally {
+      setBusy(false);
+    }
   }
+
+  async function resend() {
+    if (!unconfirmed) return;
+    setBusy(true);
+    const { error: e } = await supabase.auth.resend({
+      type: 'signup',
+      email: unconfirmed,
+      options: WEB_URL ? { emailRedirectTo: `${WEB_URL}/auth/callback` } : undefined,
+    });
+    setBusy(false);
+    setError(null);
+    if (e && (e.status === 429 || e.code === 'over_email_send_rate_limit')) setError(t.emailLimit);
+    else setNotice(t.resent);
+  }
+
+  /** Second step for accounts with two-step login on. */
+  async function onCode() {
+    setError(null);
+    setBusy(true);
+    try {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const factor = factors?.totp.find((f) => f.status === 'verified');
+      if (!factor) return;
+      const { error: e } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code: code.replace(/\s/g, '') });
+      if (e) setError(t.wrongCode);
+      else {
+        setCode('');
+        await refreshGate();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const openWeb = (path = '') => (WEB_URL ? WebBrowser.openBrowserAsync(`${WEB_URL}${path}`) : undefined);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.board }} edges={['top']}>
@@ -76,39 +136,84 @@ export default function LoginScreen() {
 
           <View style={s.sheet}>
             {!isConfigured ? <Text style={s.error}>{t.notConfigured}</Text> : null}
-            <Input
-              label={t.email}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              textContentType="emailAddress"
-            />
-            <Input
-              label={t.password}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="password"
-              textContentType="password"
-              onSubmitEditing={onSubmit}
-            />
-            {error ? <Text style={s.error}>{error}</Text> : null}
-            <Button title={t.signIn} onPress={onSubmit} loading={busy} disabled={!email || !password || !isConfigured} />
-            {DEMO && isConfigured ? (
-              <View style={s.demo}>
-                <Text style={s.demoTitle}>{t.tryDemo}</Text>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Button title={t.asStudent} variant="accent" onPress={() => demo('student')} loading={demoBusy === 'student'} disabled={!!demoBusy} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Button title={t.asTeacher} variant="secondary" onPress={() => demo('teacher')} loading={demoBusy === 'teacher'} disabled={!!demoBusy} />
-                  </View>
+            {session && gate === null ? (
+              <Loading />
+            ) : session && gate === 'code' ? (
+              <>
+                <Text style={s.title}>{t.codeTitle}</Text>
+                <Text style={s.body}>{t.codeIntro}</Text>
+                <Input
+                  label={t.code}
+                  value={code}
+                  onChangeText={setCode}
+                  keyboardType="number-pad"
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
+                  maxLength={7}
+                  onSubmitEditing={onCode}
+                />
+                {error ? <Text style={s.error}>{error}</Text> : null}
+                <Button title={t.verify} onPress={onCode} loading={busy} disabled={code.replace(/\s/g, '').length !== 6} />
+                <Button title={t.otherAccount} variant="ghost" onPress={signOut} />
+              </>
+            ) : session && (gate === 'webOnly' || gate === 'setupOnWeb') ? (
+              <>
+                <Text style={s.title}>{gate === 'webOnly' ? t.webOnlyTitle : t.setupTitle}</Text>
+                <Text style={s.body}>{gate === 'webOnly' ? t.webOnlyBody : t.setupBody}</Text>
+                {WEB_URL ? <Button title={t.openWeb} onPress={() => openWeb(gate === 'setupOnWeb' ? '/security' : '')} /> : null}
+                <Button title={t.otherAccount} variant="secondary" onPress={signOut} />
+              </>
+            ) : (
+              <>
+                <Input
+                  label={t.identifier}
+                  value={identifier}
+                  onChangeText={setIdentifier}
+                  autoCapitalize="none"
+                  autoComplete="username"
+                  textContentType="username"
+                />
+                <Input
+                  label={t.password}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  autoComplete="password"
+                  textContentType="password"
+                  onSubmitEditing={onSubmit}
+                />
+                {WEB_URL ? (
+                  <Pressable onPress={() => openWeb('/login/forgot')} hitSlop={8} style={{ alignSelf: 'flex-end' }}>
+                    <Text style={s.link}>{t.forgot}</Text>
+                  </Pressable>
+                ) : null}
+                {error ? <Text style={s.error}>{error}</Text> : null}
+                {notice ? <Text style={s.notice}>{notice}</Text> : null}
+                {unconfirmed ? <Button title={t.resend} variant="secondary" onPress={resend} disabled={busy} /> : null}
+                <Button title={t.signIn} onPress={onSubmit} loading={busy} disabled={!identifier || !password || !isConfigured} />
+                <View style={s.signupRow}>
+                  <Text style={s.body}>{t.newStudent}</Text>
+                  <Link href="/signup" asChild>
+                    <Pressable hitSlop={8}>
+                      <Text style={s.link}>{t.createAccount}</Text>
+                    </Pressable>
+                  </Link>
                 </View>
-              </View>
-            ) : null}
+                {DEMO && isConfigured ? (
+                  <View style={s.demo}>
+                    <Text style={s.demoTitle}>{t.tryDemo}</Text>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Button title={t.asStudent} variant="accent" onPress={() => demo('student')} loading={demoBusy === 'student'} disabled={!!demoBusy} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Button title={t.asTeacher} variant="secondary" onPress={() => demo('teacher')} loading={demoBusy === 'teacher'} disabled={!!demoBusy} />
+                      </View>
+                    </View>
+                  </View>
+                ) : null}
+              </>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -135,6 +240,11 @@ const s = StyleSheet.create({
     gap: 16,
   },
   error: { color: colors.danger, fontSize: 15, fontFamily: fonts.bold },
+  notice: { color: colors.leaf, fontSize: 15, fontFamily: fonts.bold },
+  title: { fontFamily: fonts.displayBold, fontSize: 24, color: colors.text },
+  body: { fontFamily: fonts.body, fontSize: 16, lineHeight: 22, color: colors.muted },
+  link: { fontFamily: fonts.bold, fontSize: 15.5, color: colors.board, textDecorationLine: 'underline' },
+  signupRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 4 },
   demo: { marginTop: 8, paddingTop: 18, borderTopWidth: 1, borderTopColor: colors.border, gap: 10 },
   demoTitle: { fontFamily: fonts.bold, color: colors.muted, fontSize: 15, textAlign: 'center' },
 });

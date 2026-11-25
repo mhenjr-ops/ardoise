@@ -28,10 +28,11 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // A confirmation email that came back to the home page instead of /auth/callback.
-  if (path === "/" && request.nextUrl.searchParams.has("code")) {
+  // An email link that came back to the home page instead of the auth routes.
+  const sp = request.nextUrl.searchParams;
+  if (path === "/" && (sp.has("code") || sp.has("error_code") || sp.has("token_hash"))) {
     const url = request.nextUrl.clone();
-    url.pathname = "/auth/callback";
+    url.pathname = sp.has("token_hash") ? "/auth/confirm" : "/auth/callback";
     return NextResponse.redirect(url);
   }
   const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`));

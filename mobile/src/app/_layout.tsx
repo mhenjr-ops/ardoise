@@ -47,6 +47,7 @@ function RootStack() {
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="signup" options={{ headerShown: false }} />
         <Stack.Screen name="course/[id]" options={{ title: '' }} />
         <Stack.Screen name="assignment/[id]" options={{ title: '' }} />
         <Stack.Screen name="page/[id]" options={{ title: '' }} />
