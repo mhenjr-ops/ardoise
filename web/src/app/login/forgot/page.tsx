@@ -4,6 +4,8 @@ import { getI18n } from "@/lib/i18n/server";
 import { PublicShell } from "@/components/public/public-shell";
 import { Button, Card, Field, Flash, Input } from "@/components/ui";
 import { requestReset } from "../actions";
+import { BotCheck } from "@/components/bot-check";
+import { botCheckKey } from "@/lib/bot-check";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -15,7 +17,15 @@ export default async function ForgotPage({ searchParams }: PageProps<"/login/for
   const [{ t, locale }, sp] = await Promise.all([getI18n(), searchParams]);
   const email = typeof sp.email === "string" ? sp.email.slice(0, 320) : "";
   const error =
-    sp.error === "email_limit" ? t.auth.emailLimit : sp.error === "link_expired" ? t.auth.linkExpired : sp.error ? t.errors.invalid : null;
+    sp.error === "email_limit"
+      ? t.auth.emailLimit
+      : sp.error === "captcha"
+        ? t.auth.captcha
+        : sp.error === "link_expired"
+          ? t.auth.linkExpired
+          : sp.error
+            ? t.errors.invalid
+            : null;
 
   return (
     <PublicShell locale={locale}>
@@ -25,6 +35,7 @@ export default async function ForgotPage({ searchParams }: PageProps<"/login/for
         <Flash error={error} ok={sp.sent ? t.auth.linkSent : null} />
         <Card className="p-6">
           <form action={requestReset} className="space-y-4">
+            <BotCheck siteKey={botCheckKey()} locale={locale} />
             <Field label={t.auth.email}>
               <Input name="email" type="email" required autoComplete="email" inputMode="email" defaultValue={email} />
             </Field>

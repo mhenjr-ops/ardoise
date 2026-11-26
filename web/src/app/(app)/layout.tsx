@@ -9,6 +9,7 @@ import {
   MessageSquareText,
   MessagesSquare,
   Settings2,
+  ShieldAlert,
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
@@ -50,10 +51,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   let listLabel = t.dashboard.myCourses;
   if (isPlatformAdmin) {
     // The master account: every university, nothing of any one school's own.
-    const [{ count: openChanges }, { count: openDemos }, { data: unreadTeam }] = await Promise.all([
+    const [{ count: openChanges }, { count: openDemos }, { data: unreadTeam }, { data: unseenAlerts }] = await Promise.all([
       supabase.from("support_requests").select("id", { count: "exact", head: true }).is("handled_at", null),
       supabase.from("demo_requests").select("id", { count: "exact", head: true }).is("handled_at", null),
       supabase.rpc("team_unread_count"),
+      supabase.rpc("alerts_unseen_count"),
     ]);
     items.push(
       { href: "/platform", label: t.master.overview, icon: <ShieldCheck size={19} aria-hidden />, exact: true },
@@ -70,6 +72,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         badge: (unreadTeam as number | null) ?? 0,
       },
       { href: "/platform/team", label: t.master.team, icon: <UsersRound size={19} aria-hidden /> },
+      {
+        href: "/platform/alerts",
+        label: t.alerts.nav,
+        icon: <ShieldAlert size={19} aria-hidden />,
+        badge: (unseenAlerts as number | null) ?? 0,
+      },
     );
     // Only the universities waiting on the team (open change requests), never the whole list:
     // the overview has search and filters for that.

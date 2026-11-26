@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getLocale } from "@/lib/i18n/server";
 import { finishJoining, isInviteToken } from "@/lib/joining";
 import { authErrorCode, needsCode, safePath, signInTarget } from "@/lib/auth-flow";
+import { captchaToken } from "@/lib/bot-check";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -39,10 +40,10 @@ export async function signIn(formData: FormData) {
     if (!data) failed("invalid");
     email = data as string;
   }
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: captchaToken(formData) } });
   if (error) {
     const code = authErrorCode(error);
-    failed(code === "unconfirmed" ? "unconfirmed" : "invalid", code === "unconfirmed" ? { email } : {});
+    failed(code === "unconfirmed" || code === "captcha" ? code : "invalid", code === "unconfirmed" ? { email } : {});
   }
   // The two-step code if the account has it on, then the invitation it came from, if any.
   redirect(await signInTarget(supabase, next));
@@ -99,11 +100,18 @@ export async function signUp(formData: FormData) {
     options: {
       data: { full_name: fullName, locale, ...(invite ? { invite } : { school_code: school, matricule }) },
       emailRedirectTo: `${await origin()}/auth/callback`,
+      captchaToken: captchaToken(formData),
     },
   });
   if (error) {
     const code = authErrorCode(error);
-    again(code === "email_limit" || code === "weak" ? code : error.message.toLowerCase().includes("already") ? "exists" : "generic");
+    again(
+      code === "email_limit" || code === "weak" || code === "captcha"
+        ? code
+        : error.message.toLowerCase().includes("already")
+          ? "exists"
+          : "generic",
+    );
   }
   // An email that already has an account comes back without an identity (and no email is
   // sent): send the person to sign in with it instead, keeping where they were going.
@@ -121,8 +129,13 @@ export async function resendConfirmation(formData: FormData) {
   const keepNext: Record<string, string> = next !== "/dashboard" ? { next } : {};
   if (!email.includes("@")) redirect(back("/login", { error: "invalid", ...keepNext }));
   const supabase = await createClient();
-  const { error } = await supabase.auth.resend({ type: "signup", email, options: { emailRedirectTo: `${await origin()}/auth/callback` } });
-  if (error && authErrorCode(error) === "email_limit") redirect(back("/login", { error: "email_limit", email, ...keepNext }));
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: `${await origin()}/auth/callback`, captchaToken: captchaToken(formData) },
+  });
+  const code = error ? authErrorCode(error) : "";
+  if (code === "email_limit" || code === "captcha") redirect(back("/login", { error: code, email, ...keepNext }));
   redirect(back("/login", { ok: "resent", email, ...keepNext }));
 }
 
@@ -131,8 +144,12 @@ export async function requestReset(formData: FormData) {
   const email = text(formData, "email").slice(0, 320);
   if (!email.includes("@")) redirect(back("/login/forgot", { error: "invalid" }));
   const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${await origin()}/auth/callback` });
-  if (error && authErrorCode(error) === "email_limit") redirect(back("/login/forgot", { error: "email_limit", email }));
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${await origin()}/auth/callback`,
+    captchaToken: captchaToken(formData),
+  });
+  const code = error ? authErrorCode(error) : "";
+  if (code === "email_limit" || code === "captcha") redirect(back("/login/forgot", { error: code, email }));
   redirect(back("/login/forgot", { sent: "1", email }));
 }
 
@@ -179,7 +196,11 @@ export async function demoSignIn(formData: FormData) {
   const role = String(formData.get("role") ?? "") as keyof typeof DEMO_ACCOUNTS;
   if (!DEMO_ENABLED || !(role in DEMO_ACCOUNTS)) redirect("/demo");
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email: DEMO_ACCOUNTS[role], password: DEMO_PASSWORD });
-  if (error) redirect("/demo?error=1");
+  const { error } = await supabase.auth.signInWithPassword({
+    email: DEMO_ACCOUNTS[role],
+    password: DEMO_PASSWORD,
+    options: { captchaToken: captchaToken(formData) },
+  });
+  if (error) redirect(`/demo?error=${authErrorCode(error) === "captcha" ? "captcha" : "1"}`);
   redirect("/dashboard");
 }

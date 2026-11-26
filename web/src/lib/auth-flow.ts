@@ -64,6 +64,7 @@ export function authErrorCode(error: { code?: string; message?: string; status?:
   if (code === "over_email_send_rate_limit" || code === "over_request_rate_limit" || msg.includes("rate limit") || error.status === 429) {
     return "email_limit";
   }
+  if (code === "captcha_failed" || msg.includes("captcha")) return "captcha";
   if (code === "email_not_confirmed" || msg.includes("not confirmed")) return "unconfirmed";
   if (code === "weak_password") return "weak";
   if (code === "same_password") return "same_password";
