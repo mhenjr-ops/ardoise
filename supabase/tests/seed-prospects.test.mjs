@@ -32,6 +32,9 @@ check('each has faculties or schools',
   (await n(`select count(*) n from public.institutions i where not exists (select 1 from public.faculties f where f.institution_id = i.id)`)) === 0);
 check('same-named departments stay in their own faculty (Computer Engineering at Buea)',
   (await n(`select count(*) n from public.departments d join public.institutions i on i.id = d.institution_id where i.slug = 'ub' and d.name = 'Computer Engineering'`)) === 2);
+check('universities known by a short name carry it',
+  (await n(`select count(*) n from public.institutions where short_name <> ''`)) === 11
+  && (await n(`select count(*) n from public.institutions where slug = 'catuc' and short_name = 'CATUC'`)) === 1);
 check('French universities are set up in French',
   (await n(`select count(*) n from public.institutions where default_locale = 'fr'`)) === 6);
 

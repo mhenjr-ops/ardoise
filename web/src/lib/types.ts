@@ -9,6 +9,9 @@ export type Institution = {
   slug: string;
   default_locale: "fr" | "en";
   grading_system: "lmd20" | "gpa4";
+  short_name?: string;
+  brand_color?: string;
+  logo_path?: string;
 };
 
 export type Course = {

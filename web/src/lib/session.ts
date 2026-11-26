@@ -57,7 +57,7 @@ export const getSession = cache(async () => {
     supabase.from("profiles").select("id, email, full_name, locale").eq("id", user.id).maybeSingle(),
     supabase
       .from("memberships")
-      .select("id, role, faculty_id, department_id, institution:institutions(id, name, slug, default_locale, grading_system)")
+      .select("id, role, faculty_id, department_id, institution:institutions(id, name, slug, default_locale, grading_system, short_name, brand_color, logo_path)")
       .eq("user_id", user.id),
   ]);
   // Two-step login: the code first if it is on; set it up first if this account must have it.

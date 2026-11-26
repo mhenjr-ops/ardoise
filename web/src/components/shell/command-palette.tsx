@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, FileText, NotebookPen, Search, UserRound } from "lucide-react";
+import { BookOpen, FileText, NotebookPen, Search, UserRound, Building2 } from "lucide-react";
 import type { SearchHit } from "@/app/api/search/route";
 
 type Labels = {
@@ -22,6 +22,7 @@ const icons = {
   assignment: NotebookPen,
   page: FileText,
   person: UserRound,
+  university: Building2,
 } as const;
 
 export function CommandPalette({ labels, compact = false }: { labels: Labels; compact?: boolean }) {

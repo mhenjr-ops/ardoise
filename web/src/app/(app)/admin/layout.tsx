@@ -14,6 +14,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     { href: "/admin/people", label: t.nav2.people, show: can.adminArea },
     { href: "/admin/structure", label: t.lmd.nav.structure, show: can.adminArea },
     { href: "/admin/requests", label: t.nav2.requests, show: can.adminArea },
+    { href: "/admin/profile", label: t.look.tab, show: can.manageSchool },
     { href: "/admin/deliberations", label: t.lmd.nav.deliberations, show: can.readResults },
     { href: "/admin/policy", label: t.lmd.nav.policy, show: can.runResults },
   ].filter((tab) => tab.show);

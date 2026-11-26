@@ -8,11 +8,16 @@ import { fmt } from "@/lib/i18n/messages-engage";
 import { formatDate } from "@/lib/format";
 import { loadStructure, type Department, type Programme, type Unit } from "@/lib/structure";
 import { StructureTree } from "@/components/structure/structure-tree";
+import { SchoolMark } from "@/components/school-mark";
+import { SchoolLookCard } from "@/components/school-look-card";
+import { ShareLink } from "@/components/copy-button";
+import { siteOrigin } from "@/lib/site";
 import { Badge, Button, Card, CardHeader, Empty, Field, Flash, Input, PageHeader, Select, Textarea } from "@/components/ui";
 import {
   addSemester,
   addUe,
   addYear,
+  createSchoolInvite,
   importOutline,
   makeCurrent,
   markSupportDone,
@@ -22,6 +27,7 @@ import {
   updateDepartment,
   updateProgramme,
   updateUnit,
+  withdrawSchoolInvite,
 } from "./actions";
 
 const CYCLES = ["licence", "master", "doctorat", "hnd", "other"] as const;
@@ -35,10 +41,11 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
   if (!isPlatformAdmin) notFound();
   const { slug } = await params;
   const sp = await searchParams;
-  const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale, status, structure_source, structure_confirmed_at").eq("slug", slug).maybeSingle();
+  const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale, status, structure_source, structure_confirmed_at, short_name, brand_color, logo_path, city, website")
+    .eq("slug", slug).maybeSingle();
   if (!school) notFound();
 
-  const [structure, { data: reqs }, { data: allStats }, { data: office }] = await Promise.all([
+  const [structure, { data: reqs }, { data: allStats }, { data: office }, { data: links }, origin] = await Promise.all([
     loadStructure(supabase, school.id),
     supabase
       .from("support_requests")
@@ -49,7 +56,18 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
       .limit(30),
     supabase.rpc("platform_schools"),
     supabase.rpc("platform_school_people", { p_institution: school.id }),
+    supabase
+      .from("invitations")
+      .select("id, token, role, full_name, email, expires_at")
+      .eq("institution_id", school.id)
+      .in("role", ["owner", "admin", "registrar"])
+      .is("accepted_at", null)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false }),
+    siteOrigin(),
   ]);
+  const openLinks = (links ?? []) as Array<{ id: string; token: string; role: string; full_name: string; email: string | null; expires_at: string }>;
   const st = ((allStats ?? []) as Array<Record<string, number | string>>).find((x) => x.id === school.id);
   const stats = st
     ? [
@@ -200,7 +218,12 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
         {t.structure.backToConsole}
       </Link>
       <PageHeader
-        title={school.name}
+        title={
+          <span className="flex items-center gap-4">
+            <SchoolMark look={school} size={52} />
+            <span className="min-w-0">{school.name}</span>
+          </span>
+        }
         subtitle={`/join/${school.slug} · ${isLive ? t.prospects.live : t.prospects.prospect}`}
       />
       <Flash error={error} ok={ok} />
@@ -281,6 +304,60 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
               </div>
             </div>
           </Card>
+
+          <Card id="invite" className="scroll-mt-6">
+            <CardHeader title={t.platformInvite.title} />
+            <div className="space-y-4 px-5 py-4">
+              <p className="text-[14px] text-slate-600">{t.platformInvite.intro}</p>
+              <form action={createSchoolInvite} className="space-y-3">
+                {common}
+                <Field label={t.platformInvite.role}>
+                  <Select name="role" defaultValue="registrar">
+                    <option value="registrar">{t.roles.registrar}</option>
+                    <option value="owner">{t.roles.owner}</option>
+                    <option value="admin">{t.roles.admin}</option>
+                  </Select>
+                </Field>
+                <Field label={t.platformInvite.name}>
+                  <Input name="full_name" maxLength={200} />
+                </Field>
+                <Field label={t.platformInvite.email} hint={t.platform.ownerEmailHelp}>
+                  <Input name="email" type="email" maxLength={320} />
+                </Field>
+                <Button type="submit" size="sm">
+                  {t.platformInvite.make}
+                </Button>
+              </form>
+              <div className="border-t border-slate-100 pt-4">
+                <p className="mb-2 text-[14.5px] font-semibold text-slate-900">{t.platformInvite.waiting}</p>
+                {openLinks.length ? (
+                  <ul className="space-y-4">
+                    {openLinks.map((l) => (
+                      <li key={l.id} className="space-y-2">
+                        <p className="flex flex-wrap items-center gap-2 text-[13.5px] text-slate-700">
+                          <Badge tone={l.role === "owner" ? "brand" : "neutral"}>{t.roles[l.role as keyof typeof t.roles] ?? l.role}</Badge>
+                          {l.full_name || l.email || ""}
+                          <span className="text-slate-400">{fmt(t.platformInvite.expires, { date: formatDate(locale, l.expires_at) })}</span>
+                        </p>
+                        <ShareLink url={`${origin}/join/${l.token}`} labels={{ copy: t.share.copy, copied: t.share.copied }} />
+                        <form action={withdrawSchoolInvite}>
+                          {common}
+                          <input type="hidden" name="id" value={l.id} />
+                          <button type="submit" className="text-[13px] font-semibold text-terracotta-600 hover:underline">
+                            {t.platformInvite.withdraw}
+                          </button>
+                        </form>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[13.5px] text-slate-500">{t.platformInvite.none}</p>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <SchoolLookCard school={school} back={`/platform/${school.slug}`} t={t} />
 
           <Card>
             <CardHeader title={t.master.office} />

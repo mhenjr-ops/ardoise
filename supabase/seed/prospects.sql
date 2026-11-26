@@ -8,7 +8,7 @@
 do $seed$
 declare
   universities constant jsonb := $json$[
-  {"slug": "ub", "name": "University of Buea", "locale": "en",
+  {"slug": "ub", "short": "UB", "name": "University of Buea", "locale": "en",
    "source": "https://kamerpower.com/university-of-buea-programs-available-for-admission https://whed.net/institutions/IAU-020049",
    "units": [
     {"name": "Faculty of Agriculture and Veterinary Medicine", "code": "FAVM", "kind": "faculty", "departments": [
@@ -88,7 +88,7 @@ declare
     {"name": "Institut des Beaux-Arts de Nkongsamba", "code": "IBA", "kind": "school", "departments": []},
     {"name": "Institut des Sciences Halieutiques", "code": "ISH", "kind": "school", "departments": []}]},
 
-  {"slug": "buib", "name": "Biaka University Institute of Buea", "locale": "en",
+  {"slug": "buib", "short": "BUIB", "name": "Biaka University Institute of Buea", "locale": "en",
    "source": "https://www.devex.com/organizations/biaka-university-institute-buea-buib-115737 https://cameroon-tribune.cm/article.html/33292/fr.html/details_2",
    "units": [
     {"name": "School of Health Sciences", "kind": "school", "departments": [
@@ -97,7 +97,7 @@ declare
     {"name": "School of Management Sciences", "kind": "school", "departments": [
       {"name": "Human Resource Management"}, {"name": "Accounting and Finance"}, {"name": "Business Administration"}]}]},
 
-  {"slug": "cuib", "name": "Catholic University Institute of Buea", "locale": "en",
+  {"slug": "cuib", "short": "CUIB", "name": "Catholic University Institute of Buea", "locale": "en",
    "source": "https://minesup.gov.cm/?p=8077 https://bueadiocese.org/?p=4001",
    "units": [
     {"name": "School of Business", "kind": "school", "departments": [
@@ -120,7 +120,7 @@ declare
       {"name": "Communication Media and Technology"}]},
     {"name": "School of Law", "kind": "school", "departments": []}]},
 
-  {"slug": "iuc", "name": "Institut Universitaire de la Côte", "locale": "fr",
+  {"slug": "iuc", "short": "IUC", "name": "Institut Universitaire de la Côte", "locale": "fr",
    "source": "https://myiuc.com/?p=5772 https://www.uni2study.com/universities/cameroon/institut-universitaire-de-la-cote",
    "units": [
     {"name": "Institut Supérieur de Technologie et du Design Industriel", "code": "ISTDI", "kind": "school", "departments": [
@@ -134,7 +134,7 @@ declare
     {"name": "Institut des Sciences de la Santé", "kind": "school", "departments": []},
     {"name": "École d'Ingénierie et des Sciences Appliquées", "kind": "school", "departments": []}]},
 
-  {"slug": "iug", "name": "Institut Universitaire du Golfe de Guinée", "locale": "fr",
+  {"slug": "iug", "short": "IUG", "name": "Institut Universitaire du Golfe de Guinée", "locale": "fr",
    "source": "https://kamerpower.com/fr/concours-cet-esg-cet-ista-2015-2016-licence-professionnelle-institut-universitaire-du-golfe-de-guinee-universite-de-dschang/ https://univ-iug.com",
    "units": [
     {"name": "École Supérieure de Gestion", "code": "ESG", "kind": "school", "departments": [
@@ -156,7 +156,7 @@ declare
       {"name": "Génie Civil", "programmes": [{"name": "Licence professionnelle en génie civil"}]}]},
     {"name": "Institut Supérieur de Commerce et de Gestion Siantou", "code": "ISCGS", "kind": "school", "departments": []}]},
 
-  {"slug": "ucac", "name": "Université Catholique d'Afrique Centrale", "locale": "fr",
+  {"slug": "ucac", "short": "UCAC", "name": "Université Catholique d'Afrique Centrale", "locale": "fr",
    "source": "https://ucac-icy.net/refonte/wp-content/uploads/2024/04/Affiche-A4-Recto-Verso-Concours-FSSG-FSJP-FPH-2024.pdf https://ucac-icy.net/refonte/wp-content/uploads/2024/10/Dossier-de-Presse-FSSG-1st-Graduation-Ceremony-2-1.pdf",
    "units": [
     {"name": "Faculté des Sciences Sociales et de Gestion", "code": "FSSG", "kind": "faculty", "departments": [
@@ -176,7 +176,7 @@ declare
     {"name": "École des Sciences de la Santé", "code": "ESS", "kind": "school", "departments": []},
     {"name": "Institut UCAC-ICAM", "kind": "school", "departments": []}]},
 
-  {"slug": "upac", "name": "Université Protestante d'Afrique Centrale", "locale": "fr",
+  {"slug": "upac", "short": "UPAC", "name": "Université Protestante d'Afrique Centrale", "locale": "fr",
    "source": "https://maligah.com/entreprises/details/Universit%C3%A9-Protestante-d'Afrique-Centrale?id=186116",
    "units": [
     {"name": "Faculté de Théologie Protestante et des Sciences Religieuses", "code": "FTPSR", "kind": "faculty", "departments": [
@@ -190,7 +190,7 @@ declare
     {"name": "Faculté des Sciences de la Santé", "code": "FSS", "kind": "faculty", "departments": [
       {"name": "Biologie Clinique"}, {"name": "Génie Sanitaire et Santé Publique"}, {"name": "Sciences Infirmières"}]}]},
 
-  {"slug": "npui", "name": "National Polytechnic University Institute, Bamenda", "locale": "en",
+  {"slug": "npui", "short": "NPUI", "name": "National Polytechnic University Institute, Bamenda", "locale": "en",
    "source": "https://kamerpower.com/national-polytechnic-university-of-bamenda-npbedu-org-university-institute/2 https://www.adexen.com/company/206137 https://www.npbedu.org",
    "units": [
     {"name": "School of Business, Finance and Management", "kind": "school", "departments": [
@@ -219,7 +219,7 @@ declare
       {"name": "Agricultural Production Technology"}, {"name": "Agropastoral Entrepreneurship"},
       {"name": "Animal Production Technology"}, {"name": "Crop Production Technology"}, {"name": "Food Technology"}]}]},
 
-  {"slug": "catuc", "name": "Catholic University of Cameroon, Bamenda", "locale": "en",
+  {"slug": "catuc", "short": "CATUC", "name": "Catholic University of Cameroon, Bamenda", "locale": "en",
    "source": "https://www.minesup.gov.cm/?p=7781 https://en.wikipedia.org/wiki/Catholic_University_of_Cameroon,_Bamenda",
    "units": [
     {"name": "Faculty of Arts", "kind": "faculty", "departments": [
@@ -236,7 +236,7 @@ declare
       {"name": "Nursing"}, {"name": "Medical Laboratory Science"}]},
     {"name": "School of Law", "kind": "school", "departments": []}]},
 
-  {"slug": "buist", "name": "Bamenda University Institute of Science and Technology", "locale": "en",
+  {"slug": "buist", "short": "BUIST", "name": "Bamenda University Institute of Science and Technology", "locale": "en",
    "source": "https://universitycompass.com/universities/Bamenda-University-of-Science-and-Technology.php https://www.minesup.gov.cm/?p=11603",
    "units": [
     {"name": "Faculty of Agriculture", "kind": "faculty", "departments": [
@@ -251,7 +251,7 @@ declare
     {"name": "Faculty of Law", "kind": "faculty", "departments": [{"name": "Law"}, {"name": "Business Law"}]},
     {"name": "Faculty of Arts", "kind": "faculty", "departments": [{"name": "Fine and Performing Arts"}]}]},
 
-  {"slug": "iub", "name": "International University, Bamenda", "locale": "en",
+  {"slug": "iub", "short": "IUB", "name": "International University, Bamenda", "locale": "en",
    "source": "https://en.wikipedia.org/wiki/International_University,_Bamenda",
    "units": [
     {"name": "Faculty of Agriculture", "kind": "faculty", "departments": []},
@@ -286,8 +286,8 @@ begin
   for uni in select * from jsonb_array_elements(universities) loop
     select id, structure_confirmed_at into inst, confirmed from public.institutions where slug = uni ->> 'slug';
     if inst is null then
-      insert into public.institutions (name, slug, default_locale, status, structure_source, structure_confirmed_at)
-      values (uni ->> 'name', uni ->> 'slug', uni ->> 'locale', 'prospect', uni ->> 'source', null)
+      insert into public.institutions (name, slug, short_name, default_locale, status, structure_source, structure_confirmed_at)
+      values (uni ->> 'name', uni ->> 'slug', coalesce(uni ->> 'short', ''), uni ->> 'locale', 'prospect', uni ->> 'source', null)
       returning id into inst;
     elsif confirmed is not null then
       continue; -- the university has checked its structure: leave it as it is

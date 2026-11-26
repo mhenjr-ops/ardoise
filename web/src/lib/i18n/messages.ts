@@ -370,6 +370,8 @@ const fr = {
   },
   errors: {
     generic: "Une erreur est survenue. Réessayez.",
+    logo_too_large: "Le logo dépasse 1 Mo.",
+    logo_type: "Utilisez une image PNG, JPEG ou WebP.",
     in_use: "Encore utilisé : retirez d'abord ce qu'il contient.",
     platform_account: "C'est le compte de l'équipe Ardoise : il ne peut pas rejoindre une université. Déconnectez-vous et utilisez le compte de la personne.",
     rate_limited: "Trop d'envois d'un coup. Réessayez dans une minute.",
@@ -768,6 +770,8 @@ const en: CoreMessages = {
   },
   errors: {
     generic: "Something went wrong. Try again.",
+    logo_too_large: "The logo is over 1 MB.",
+    logo_type: "Use a PNG, JPEG or WebP image.",
     in_use: "Still in use: remove what's inside it first.",
     platform_account: "This is the Ardoise team account: it can't join a university. Sign out and use the person's own account.",
     rate_limited: "Too many at once. Try again in a minute.",

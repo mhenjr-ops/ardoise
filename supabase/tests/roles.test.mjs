@@ -401,6 +401,39 @@ check('the master dashboard shows status, whether the structure is checked, and 
   card.status === 'live' && card.structure_confirmed_at === null && card.faculties >= 1 && card.departments >= 1);
 await as('P', `select public.set_structure_confirmed($1, true)`, [inst]);
 
+// --- A university’s look, and links the Ardoise team sends to its people -------------------
+const regToken = (await one('P', `select public.platform_invite($1, 'registrar', 'reg@demo.cm', 'Registrar Person') as t`, [inst])).t;
+check('the Ardoise team sends a link to a university’s registrar', typeof regToken === 'string' && regToken.length >= 60);
+await expectError('a university administrator cannot use the Ardoise team’s invite',
+  () => as('AD', `select public.platform_invite($1, 'owner')`, [inst]), 'forbidden');
+await expectError('the Ardoise team only invites heads, administrators and registrars',
+  () => as('P', `select public.platform_invite($1, 'teacher')`, [inst]), 'invalid');
+const regInv = (await one('Q2', `select id from public.invitations where token = $1`, [regToken]))?.id;
+check('every teammate sees the links sent to universities', !!regInv);
+await as('Q2', `select public.revoke_invitation($1)`, [regInv]);
+check('…and a teammate can withdraw one', (await as(null, `select public.invitation_preview($1) as p`, [regToken], 'anon')).rows[0].p.status === 'revoked');
+
+await as('AD', `select public.set_school_profile($1, 'UT', '#1f5c4a', 'Buea', 'https://ut.example.cm')`, [inst]);
+const look = await one('P', `select short_name, brand_color, city, website from public.institutions where id = $1`, [inst]);
+check('a university’s administrator sets its short name, colour, city and website',
+  look.short_name === 'UT' && look.brand_color === '#1f5c4a' && look.city === 'Buea' && look.website === 'https://ut.example.cm');
+await expectError('a teacher cannot change the university’s look',
+  () => as('T', `select public.set_school_profile($1, 'X', '', '', '')`, [inst]), 'forbidden');
+await expectError('a colour must be a #rrggbb colour', () => as('AD', `select public.set_school_profile($1, 'UT', 'red', '', '')`, [inst]));
+await expectError('a website must be a web address', () => as('AD', `select public.set_school_profile($1, 'UT', '', '', 'javascript:alert(1)')`, [inst]));
+await as('AD', `insert into storage.objects (bucket_id, name) values ('brand', $1)`, [`${inst}/logo-1.png`]);
+await as('AD', `select public.set_school_logo($1, $2)`, [inst, `${inst}/logo-1.png`]);
+check('…and uploads its logo', (await one('P', `select logo_path from public.institutions where id = $1`, [inst])).logo_path === `${inst}/logo-1.png`);
+await expectError('a logo must sit in the university’s own folder',
+  () => as('AD', `select public.set_school_logo($1, 'someone-else/logo.png')`, [inst]), 'invalid');
+await expectError('nobody uploads into another university’s folder',
+  () => as('Z', `insert into storage.objects (bucket_id, name) values ('brand', $1)`, [`${inst}/logo-2.png`]));
+await as('P', `select public.set_school_profile($1, 'UT', '#1f5c4a', 'Buea', '')`, [inst]);
+check('the Ardoise team can set it too', (await one('P', `select website from public.institutions where id = $1`, [inst])).website === '');
+check('the join page shows the university’s look',
+  (await as(null, `select public.invitation_preview($1) as p`, [regToken], 'anon')).rows[0].p.logo_path === `${inst}/logo-1.png`);
+check('the master dashboard carries it', (await one('P', `select short_name, logo_path from public.platform_schools() where id = $1`, [inst])).short_name === 'UT');
+
 // --- Two-step login, enforced by the database ------------------------------------------------
 const status = async (user) => (await one(user, `select public.account_status() as s`)).s;
 const tTeaches = await count('T', `select count(*) n from public.enrollments where user_id = $1`, [ids.T]);

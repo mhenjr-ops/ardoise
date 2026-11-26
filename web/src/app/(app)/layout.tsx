@@ -15,6 +15,8 @@ import {
 import { getSession } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
 import { NDOP_CHALK } from "@/lib/ndop";
+import { schoolColor, schoolInitials, type SchoolLook } from "@/lib/school-look";
+import { SchoolMark } from "@/components/school-mark";
 import { signOut } from "@/app/actions";
 import { LocaleSwitch } from "@/components/locale-switch";
 import { Avatar } from "@/components/ui";
@@ -69,15 +71,27 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       },
       { href: "/platform/team", label: t.master.team, icon: <UsersRound size={19} aria-hidden /> },
     );
-    const { data: schools } = await supabase.from("institutions").select("id, name, slug").order("name");
-    courses = ((schools ?? []) as Array<{ id: string; name: string; slug: string }>).map((s) => ({
-      id: s.id,
-      code: s.slug.toUpperCase(),
-      title: s.name,
-      color: "#C9A227",
-      href: `/platform/${s.slug}`,
-    }));
-    listLabel = t.master.universities;
+    // Only the universities waiting on the team (open change requests), never the whole list:
+    // the overview has search and filters for that.
+    const { data: waiting } = await supabase.from("support_requests").select("institution_id").is("handled_at", null).limit(500);
+    const waitingIds = [...new Set(((waiting ?? []) as Array<{ institution_id: string }>).map((r) => r.institution_id))];
+    if (waitingIds.length) {
+      const { data: schools } = await supabase
+        .from("institutions")
+        .select("id, name, slug, short_name, brand_color, logo_path")
+        .in("id", waitingIds.slice(0, 50))
+        .order("name")
+        .limit(8);
+      courses = ((schools ?? []) as Array<SchoolLook & { id: string; slug: string }>).map((s) => ({
+        id: s.id,
+        code: schoolInitials(s),
+        title: s.name,
+        color: schoolColor(s),
+        href: `/platform/${s.slug}`,
+        mark: <SchoolMark look={s} size={22} />,
+      }));
+    }
+    listLabel = t.directory.waitingOnYou;
   } else {
     items.push(
       { href: "/dashboard", label: t.nav.dashboard, icon: <LayoutDashboard size={19} aria-hidden /> },
@@ -119,7 +133,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <Wordmark dark />
           </Link>
           {institution ? (
-            <p className="relative mt-3 line-clamp-2 text-[13px] leading-snug text-chalk/65">{institution.name}</p>
+            <div className="relative mt-4 flex items-center gap-3">
+              <SchoolMark look={institution} size={36} className="ring-1 ring-white/15" />
+              <p className="line-clamp-2 min-w-0 text-[13.5px] font-semibold leading-snug text-chalk/85">{institution.name}</p>
+            </div>
           ) : isPlatformAdmin ? (
             <p className="relative mt-3 text-[13px] leading-snug text-chalk/65">{t.master.subtitle}</p>
           ) : null}
@@ -166,7 +183,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       {/* Phones: slim slate bar */}
       <header className="sticky top-0 z-20 flex items-center gap-2 bg-ardoise px-3 py-2 text-chalk md:hidden">
         <Link href={isPlatformAdmin ? "/platform" : "/dashboard"} className="flex min-w-0 items-center gap-2.5">
-          <LogoMark size={32} />
+          {institution ? <SchoolMark look={institution} size={32} /> : <LogoMark size={32} />}
           <span className="truncate text-[15px] font-semibold">{institution?.name ?? (isPlatformAdmin ? t.master.subtitle : "Ardoise")}</span>
         </Link>
         <div className="ml-auto flex items-center">

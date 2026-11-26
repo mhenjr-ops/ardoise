@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Building2, MailCheck, ShieldCheck, UserRound } from "lucide-react";
+import { MailCheck, ShieldCheck, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { isInviteToken, schoolDirectory } from "@/lib/joining";
 import { getI18n } from "@/lib/i18n/server";
@@ -9,6 +9,7 @@ import { fmt } from "@/lib/i18n/messages-engage";
 import type { InstitutionRole } from "@/lib/types";
 import { Button, Card, Flash, buttonClass } from "@/components/ui";
 import { PublicShell } from "@/components/public/public-shell";
+import { SchoolMark } from "@/components/school-mark";
 import { acceptInvitation, signOutToInvitation } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,6 +19,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
 type Preview = {
   institution: string;
+  short_name?: string;
+  brand_color?: string;
+  logo_path?: string;
   role: InstitutionRole;
   faculty: string | null;
   department: string | null;
@@ -73,9 +77,16 @@ export default async function JoinPage({ params, searchParams }: PageProps<"/joi
           <Flash error={errorText} />
           <Card className="mt-6 divide-y divide-slate-100">
             <div className="flex items-center gap-4 px-6 py-5">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-ardoise text-chalk">
-                {team ? <ShieldCheck size={20} aria-hidden /> : <Building2 size={20} aria-hidden />}
-              </span>
+              {team ? (
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-ardoise text-chalk">
+                  <ShieldCheck size={20} aria-hidden />
+                </span>
+              ) : (
+                <SchoolMark
+                  look={{ name: v.institution, short_name: v.short_name, brand_color: v.brand_color, logo_path: v.logo_path }}
+                  size={56}
+                />
+              )}
               <div>
                 <p className="font-display text-xl font-semibold">{team ? t.master.teamTitle : v.institution}</p>
                 <p className="text-[15px] text-slate-600">

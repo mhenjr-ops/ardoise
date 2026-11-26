@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-export type SearchHit = { kind: "course" | "assignment" | "page" | "person"; id: string; title: string; sub: string; href: string };
+export type SearchHit = {
+  kind: "course" | "assignment" | "page" | "person" | "university";
+  id: string;
+  title: string;
+  sub: string;
+  href: string;
+};
 
 /** Search across what the signed-in user can see (row-level security does the scoping). */
 export async function GET(request: NextRequest) {
@@ -19,15 +25,34 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ hits: [] }, { status: 401 });
 
   const like = `*${q}*`;
-  const [courses, assignments, pages, people] = await Promise.all([
+  const [courses, assignments, pages, people, { data: isTeam }] = await Promise.all([
     supabase.from("courses").select("id, code, title").or(`title.ilike.${like},code.ilike.${like}`).limit(5),
     supabase.from("assignments").select("id, course_id, title, course:courses(code)").ilike("title", like).limit(6),
     supabase.from("pages").select("id, course_id, title, course:courses(code)").ilike("title", like).limit(5),
     supabase.from("profiles").select("id, full_name, email").or(`full_name.ilike.${like},email.ilike.${like}`).limit(6),
+    supabase.rpc("is_platform_admin"),
   ]);
+  // The Ardoise team finds any university by name, link name, short name or city.
+  const universities = isTeam
+    ? (
+        await supabase
+          .from("institutions")
+          .select("id, name, slug, short_name, city, status")
+          .or(`name.ilike.${like},slug.ilike.${like},short_name.ilike.${like},city.ilike.${like}`)
+          .order("name")
+          .limit(6)
+      ).data ?? []
+    : [];
 
   const code = (c: unknown) => (Array.isArray(c) ? c[0]?.code : (c as { code?: string } | null)?.code) ?? "";
   const hits: SearchHit[] = [
+    ...universities.map((u) => ({
+      kind: "university" as const,
+      id: u.id,
+      title: u.name,
+      sub: [u.short_name, u.city].filter(Boolean).join(" · ") || `/join/${u.slug}`,
+      href: `/platform/${u.slug}`,
+    })),
     ...(courses.data ?? []).map((c) => ({ kind: "course" as const, id: c.id, title: c.title, sub: c.code, href: `/courses/${c.id}` })),
     ...(assignments.data ?? []).map((a) => ({
       kind: "assignment" as const,

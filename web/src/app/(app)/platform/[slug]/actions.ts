@@ -21,6 +21,30 @@ function done(back: string, anchor: string, extra = "ok=1"): never {
   redirect(`${back}?${extra}#${anchor}`);
 }
 
+/** A link for the university's head, administrator or registrar, from the Ardoise team. */
+export async function createSchoolInvite(formData: FormData) {
+  const back = page(formData);
+  const role = String(formData.get("role") ?? "");
+  if (!["owner", "admin", "registrar"].includes(role)) redirect(`${back}?error=invalid#invite`);
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("platform_invite", {
+    p_institution: str(formData, "institution_id", 40),
+    p_role: role,
+    p_email: str(formData, "email", 320),
+    p_full_name: str(formData, "full_name", 200),
+  });
+  if (error) redirect(`${back}?error=${errorCode(error)}#invite`);
+  done(back, "invite");
+}
+
+export async function withdrawSchoolInvite(formData: FormData) {
+  const back = page(formData);
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("revoke_invitation", { p_invitation: str(formData, "id", 40) });
+  if (error) redirect(`${back}?error=${errorCode(error)}#invite`);
+  done(back, "invite");
+}
+
 /** Open a university to students, or take it back to preparation. */
 export async function setSchoolStatus(formData: FormData) {
   const back = page(formData);

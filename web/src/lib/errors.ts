@@ -21,6 +21,7 @@ const KNOWN = [
 export function errorCode(error: { message?: string; code?: string } | null | undefined): string {
   if (!error) return "generic";
   if (error.code === "23505") return "duplicate";
+  if (error.code === "23514") return "invalid"; // a check constraint: a value out of bounds
   const message = error.message ?? "";
   return KNOWN.find((k) => message.includes(k)) ?? "generic";
 }

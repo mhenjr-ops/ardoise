@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, MessageSquareText, Plus } from "lucide-react";
+import { ArrowRight, MessageSquareText, Plus, Search } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { errorText, getI18n } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/messages-engage";
@@ -9,6 +9,7 @@ import { siteOrigin } from "@/lib/site";
 import { NDOP_CHALK } from "@/lib/ndop";
 import { Badge, Button, Card, Empty, Field, Flash, Input, Select } from "@/components/ui";
 import { ShareLink } from "@/components/copy-button";
+import { SchoolMark } from "@/components/school-mark";
 import { createSchool } from "./actions";
 
 type School = {
@@ -27,7 +28,15 @@ type School = {
   structure_source: string;
   faculties: number;
   departments: number;
+  short_name: string;
+  brand_color: string;
+  logo_path: string;
+  city: string;
 };
+
+const SHOWS = ["all", "live", "prospect", "check", "waiting"] as const;
+type Show = (typeof SHOWS)[number];
+const fold = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 /** The master dashboard: every university and its few numbers that matter, and new universities. */
 export default async function PlatformPage({ searchParams }: PageProps<"/platform">) {
@@ -50,15 +59,42 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
     siteOrigin(),
   ]);
   const allSchools = (schools ?? []) as School[];
-  const schoolList = allSchools.filter((s) => s.status === "live");
-  const prospects = allSchools.filter((s) => s.status === "prospect");
+  const liveSchools = allSchools.filter((s) => s.status === "live");
+  const prospectSchools = allSchools.filter((s) => s.status === "prospect");
+  // Search and filters, so the page still works with a hundred universities.
+  const q = typeof params.q === "string" ? params.q.trim().slice(0, 60) : "";
+  const show: Show = SHOWS.includes(params.show as Show) ? (params.show as Show) : "all";
+  const keep = (s: School) =>
+    (!q || [s.name, s.slug, s.short_name, s.city].some((x) => fold(x ?? "").includes(fold(q)))) &&
+    (show === "all" ||
+      (show === "live" && s.status === "live") ||
+      (show === "prospect" && s.status === "prospect") ||
+      (show === "check" && !s.structure_confirmed_at) ||
+      (show === "waiting" && s.open_requests > 0));
+  const schoolList = liveSchools.filter(keep);
+  const prospects = prospectSchools.filter(keep);
+  const chips: Array<{ key: Show; label: string; n: number }> = [
+    { key: "all", label: t.directory.all, n: allSchools.length },
+    { key: "live", label: t.prospects.live, n: liveSchools.length },
+    { key: "prospect", label: t.prospects.prospect, n: prospectSchools.length },
+    { key: "check", label: t.prospects.unconfirmed, n: allSchools.filter((s) => !s.structure_confirmed_at).length },
+    { key: "waiting", label: t.directory.waitingOnYou, n: allSchools.filter((s) => s.open_requests > 0).length },
+  ];
+  const chipHref = (key: Show) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (key !== "all") sp.set("show", key);
+    const qs = sp.toString();
+    return (qs ? `/platform?${qs}` : "/platform") as "/platform";
+  };
+  const filtering = Boolean(q) || show !== "all";
   const schoolName = new Map(allSchools.map((s) => [s.id, s.name]));
-  const sum = (k: keyof School) => schoolList.reduce((n, x) => n + Number(x[k] ?? 0), 0);
+  const sum = (k: keyof School) => liveSchools.reduce((n, x) => n + Number(x[k] ?? 0), 0);
   const stats = [
     {
       label: t.master.statSchools,
-      value: schoolList.length,
-      suffix: prospects.length ? fmt(t.prospects.inPrep, { n: prospects.length }) : undefined,
+      value: liveSchools.length,
+      suffix: prospectSchools.length ? fmt(t.prospects.inPrep, { n: prospectSchools.length }) : undefined,
     },
     { label: t.master.statStudents, value: sum("students_joined"), suffix: fmt(t.master.onList, { n: sum("students_listed") }) },
     { label: t.master.users, value: userCount ?? 0 },
@@ -94,6 +130,37 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
       </section>
       <Flash error={errorText(t, typeof params.error === "string" ? params.error : null)} />
 
+      {allSchools.length > 0 ? (
+        <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
+          <form action="/platform" className="relative w-full lg:max-w-sm">
+            <Search size={17} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Input name="q" defaultValue={q} placeholder={t.directory.search} aria-label={t.directory.search} className="pl-9" />
+            {show !== "all" ? <input type="hidden" name="show" value={show} /> : null}
+          </form>
+          <nav className="flex flex-wrap gap-2" aria-label={t.directory.search}>
+            {chips.map((c) => (
+              <Link
+                key={c.key}
+                href={chipHref(c.key)}
+                aria-current={show === c.key ? "page" : undefined}
+                className={`rounded-full px-3 py-1.5 text-[13.5px] font-semibold ring-1 transition-colors ${
+                  show === c.key ? "bg-ardoise text-chalk ring-ardoise" : "bg-paper text-slate-700 ring-slate-200 hover:ring-ardoise"
+                }`}
+              >
+                {c.label} <span className={`num ${show === c.key ? "text-chalk/70" : "text-slate-400"}`}>{c.n}</span>
+              </Link>
+            ))}
+          </nav>
+        </div>
+      ) : null}
+
+      {filtering && !schoolList.length && !prospects.length ? (
+        <Card className="mb-8 p-6">
+          <Empty>{t.directory.noMatch}</Empty>
+        </Card>
+      ) : null}
+
+      {schoolList.length || !filtering ? (
       <section className="mb-8">
         <h2 className="mb-4 font-display text-2xl font-semibold">{t.master.universities}</h2>
         {schoolList.length ? (
@@ -105,10 +172,11 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
                 className="group flex flex-col rounded-[var(--radius-card)] border border-slate-200 bg-paper p-5 transition-colors hover:border-ardoise"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <SchoolMark look={sc} size={44} />
+                  <div className="min-w-0 flex-1">
                     <p className="font-display text-[1.2rem] font-semibold leading-snug text-slate-900">{sc.name}</p>
                     <p className="text-[13px] text-slate-500">
-                      /join/{sc.slug} · {sc.default_locale.toUpperCase()} · {formatDate(locale, sc.created_at)}
+                      {sc.city ? `${sc.city} · ` : ""}/join/{sc.slug} · {sc.default_locale.toUpperCase()} · {formatDate(locale, sc.created_at)}
                     </p>
                   </div>
                   <ArrowRight size={18} className="mt-1 shrink-0 text-slate-300 transition-colors group-hover:text-ardoise" aria-hidden />
@@ -148,6 +216,7 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
           </Card>
         )}
       </section>
+      ) : null}
 
       {prospects.length > 0 ? (
         <section className="mb-8">
@@ -160,7 +229,8 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
                   href={`/platform/${sc.slug}`}
                   className="group flex h-full items-start justify-between gap-3 rounded-[var(--radius-card)] border border-dashed border-slate-300 bg-paper/60 px-4 py-3.5 transition-colors hover:border-ardoise hover:bg-paper"
                 >
-                  <span className="min-w-0">
+                  <SchoolMark look={sc} size={36} />
+                  <span className="min-w-0 flex-1">
                     <span className="block font-semibold leading-snug text-slate-900">{sc.name}</span>
                     <span className="mt-0.5 block text-[13px] text-slate-500">
                       {fmt(t.prospects.size, { f: sc.faculties, d: sc.departments })} · {sc.default_locale.toUpperCase()}

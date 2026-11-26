@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 export type NavItem = { href: string; label: string; icon: ReactNode; badge?: number; exact?: boolean };
-export type NavCourse = { id: string; code: string; title: string; color: string; href?: string };
+export type NavCourse = { id: string; code: string; title: string; color: string; href?: string; mark?: ReactNode };
 
 function isActive(pathname: string, href: string, exact = false) {
   return pathname === href || (!exact && pathname.startsWith(`${href}/`));
@@ -62,7 +62,7 @@ export function SidebarNav({ items, courses, coursesLabel }: { items: NavItem[];
                       active ? "bg-white/[0.09] text-chalk" : "text-chalk/70 hover:bg-white/[0.06] hover:text-chalk"
                     }`}
                   >
-                    <span aria-hidden className="h-2.5 w-2.5 shrink-0 rotate-45 rounded-[2px]" style={{ backgroundColor: c.color }} />
+                    {c.mark ?? <span aria-hidden className="h-2.5 w-2.5 shrink-0 rotate-45 rounded-[2px]" style={{ backgroundColor: c.color }} />}
                     <span className="num font-bold">{c.code}</span>
                     <span className="truncate text-chalk/50">{c.title}</span>
                   </Link>
