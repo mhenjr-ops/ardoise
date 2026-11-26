@@ -45,6 +45,35 @@ export async function withdrawSchoolInvite(formData: FormData) {
   done(back, "invite");
 }
 
+/** A link for the registrar to check the structure without an account. */
+export async function createStructureReview(formData: FormData) {
+  const back = page(formData);
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("create_structure_review", { p_institution: str(formData, "institution_id", 40) });
+  if (error) redirect(`${back}?error=${errorCode(error)}#check`);
+  done(back, "check");
+}
+
+export async function withdrawStructureReview(formData: FormData) {
+  const back = page(formData);
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("revoke_structure_review", { p_review: str(formData, "id", 40) });
+  if (error) redirect(`${back}?error=${errorCode(error)}#check`);
+  done(back, "check");
+}
+
+export async function markReviewAnswerDone(formData: FormData) {
+  const back = page(formData);
+  const { supabase, user } = await actionSession();
+  const { error } = await supabase
+    .from("structure_review_answers")
+    .update({ handled_at: new Date().toISOString(), handled_by: user.id })
+    .eq("id", str(formData, "id", 40));
+  if (error) redirect(`${back}?error=${errorCode(error)}#check`);
+  revalidatePath("/platform", "layout");
+  done(back, "check");
+}
+
 /** Open a university to students, or take it back to preparation. */
 export async function setSchoolStatus(formData: FormData) {
   const back = page(formData);

@@ -73,8 +73,13 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     );
     // Only the universities waiting on the team (open change requests), never the whole list:
     // the overview has search and filters for that.
-    const { data: waiting } = await supabase.from("support_requests").select("institution_id").is("handled_at", null).limit(500);
-    const waitingIds = [...new Set(((waiting ?? []) as Array<{ institution_id: string }>).map((r) => r.institution_id))];
+    const [{ data: waiting }, { data: corrections }] = await Promise.all([
+      supabase.from("support_requests").select("institution_id").is("handled_at", null).limit(500),
+      supabase.from("structure_review_answers").select("institution_id").is("handled_at", null).limit(500),
+    ]);
+    const waitingIds = [
+      ...new Set(([...(waiting ?? []), ...(corrections ?? [])] as Array<{ institution_id: string }>).map((r) => r.institution_id)),
+    ];
     if (waitingIds.length) {
       const { data: schools } = await supabase
         .from("institutions")

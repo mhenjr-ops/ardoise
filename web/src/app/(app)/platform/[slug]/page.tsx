@@ -18,7 +18,9 @@ import {
   addUe,
   addYear,
   createSchoolInvite,
+  createStructureReview,
   importOutline,
+  markReviewAnswerDone,
   makeCurrent,
   markSupportDone,
   removeItem,
@@ -28,6 +30,7 @@ import {
   updateProgramme,
   updateUnit,
   withdrawSchoolInvite,
+  withdrawStructureReview,
 } from "./actions";
 
 const CYCLES = ["licence", "master", "doctorat", "hnd", "other"] as const;
@@ -45,7 +48,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
     .eq("slug", slug).maybeSingle();
   if (!school) notFound();
 
-  const [structure, { data: reqs }, { data: allStats }, { data: office }, { data: links }, origin] = await Promise.all([
+  const [structure, { data: reqs }, { data: allStats }, { data: office }, { data: links }, origin, { data: reviewRows }, { data: answerRows }] = await Promise.all([
     loadStructure(supabase, school.id),
     supabase
       .from("support_requests")
@@ -66,7 +69,32 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false }),
     siteOrigin(),
+    supabase
+      .from("structure_reviews")
+      .select("id, token, created_at, opened_at, expires_at")
+      .eq("institution_id", school.id)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("structure_review_answers")
+      .select("id, verdict, reviewer_name, reviewer_title, flagged, missing, notes, created_at, handled_at")
+      .eq("institution_id", school.id)
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
+  const reviewLinks = (reviewRows ?? []) as Array<{ id: string; token: string; created_at: string; opened_at: string | null; expires_at: string }>;
+  const answers = (answerRows ?? []) as Array<{
+    id: string;
+    verdict: "confirmed" | "changes";
+    reviewer_name: string;
+    reviewer_title: string;
+    flagged: Array<{ kind: string; name: string; parent: string }>;
+    missing: Array<{ unit: string; text: string }>;
+    notes: string;
+    created_at: string;
+    handled_at: string | null;
+  }>;
   const openLinks = (links ?? []) as Array<{ id: string; token: string; role: string; full_name: string; email: string | null; expires_at: string }>;
   const st = ((allStats ?? []) as Array<Record<string, number | string>>).find((x) => x.id === school.id);
   const stats = st
@@ -301,6 +329,104 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
                     {school.structure_confirmed_at ? t.prospects.unconfirm : t.prospects.confirm}
                   </Button>
                 </form>
+              </div>
+            </div>
+          </Card>
+
+          <Card id="check" className="scroll-mt-6">
+            <CardHeader title={t.review.card} />
+            <div className="space-y-4 px-5 py-4">
+              <p className="text-[14px] text-slate-600">{t.review.cardIntro}</p>
+              {reviewLinks.length ? (
+                <ul className="space-y-4">
+                  {reviewLinks.map((l) => (
+                    <li key={l.id} className="space-y-2">
+                      <p className="text-[13px] text-slate-500">
+                        {l.opened_at ? fmt(t.review.opened, { date: formatDate(locale, l.opened_at) }) : t.review.notOpened} ·{" "}
+                        {fmt(t.platformInvite.expires, { date: formatDate(locale, l.expires_at) })}
+                      </p>
+                      <ShareLink url={`${origin}/review/${l.token}`} labels={{ copy: t.share.copy, copied: t.share.copied }} />
+                      <form action={withdrawStructureReview}>
+                        {common}
+                        <input type="hidden" name="id" value={l.id} />
+                        <button type="submit" className="text-[13px] font-semibold text-terracotta-600 hover:underline">
+                          {t.platformInvite.withdraw}
+                        </button>
+                      </form>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <form action={createStructureReview}>
+                  {common}
+                  <Button type="submit" size="sm">
+                    {t.review.make}
+                  </Button>
+                </form>
+              )}
+              <div className="border-t border-slate-100 pt-4">
+                <p className="mb-2 text-[14.5px] font-semibold text-slate-900">{t.review.answers}</p>
+                {answers.length ? (
+                  <ul className="space-y-4">
+                    {answers.map((a) => (
+                      <li key={a.id} className="space-y-1.5 text-[14px]">
+                        <p className="font-semibold text-slate-900">
+                          {fmt(a.verdict === "confirmed" ? t.review.confirmedBy : t.review.changesBy, { name: a.reviewer_name })}
+                          <span className="ml-1 font-normal text-slate-500">
+                            {a.reviewer_title ? `· ${a.reviewer_title} ` : ""}· {formatDate(locale, a.created_at)}
+                          </span>
+                        </p>
+                        {a.flagged.length ? (
+                          <div>
+                            <p className="text-[12.5px] font-semibold text-terracotta-600">{t.review.wrong}</p>
+                            <ul className="list-disc pl-5 text-slate-700">
+                              {a.flagged.map((f, i) => (
+                                <li key={i}>
+                                  {f.name}
+                                  {f.parent ? <span className="text-slate-400"> · {f.parent}</span> : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {a.missing.length ? (
+                          <div>
+                            <p className="text-[12.5px] font-semibold text-ochre-700">{t.review.missing}</p>
+                            <ul className="space-y-1 text-slate-700">
+                              {a.missing.map((m, i) => (
+                                <li key={i} className="whitespace-pre-line">
+                                  {m.unit ? <span className="text-slate-400">{m.unit}: </span> : null}
+                                  {m.text}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {a.notes ? (
+                          <div>
+                            <p className="text-[12.5px] font-semibold text-slate-500">{t.review.remarks}</p>
+                            <p className="whitespace-pre-line text-slate-700">{a.notes}</p>
+                          </div>
+                        ) : null}
+                        {a.verdict === "changes" ? (
+                          a.handled_at ? (
+                            <Badge tone="success">{t.review.done}</Badge>
+                          ) : (
+                            <form action={markReviewAnswerDone}>
+                              {common}
+                              <input type="hidden" name="id" value={a.id} />
+                              <Button type="submit" size="sm" variant="secondary">
+                                {t.review.markDone}
+                              </Button>
+                            </form>
+                          )
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[13.5px] text-slate-500">{t.review.noAnswers}</p>
+                )}
               </div>
             </div>
           </Card>

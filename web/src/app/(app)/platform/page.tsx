@@ -32,6 +32,7 @@ type School = {
   brand_color: string;
   logo_path: string;
   city: string;
+  open_reviews: number;
 };
 
 const SHOWS = ["all", "live", "prospect", "check", "waiting"] as const;
@@ -70,7 +71,7 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
       (show === "live" && s.status === "live") ||
       (show === "prospect" && s.status === "prospect") ||
       (show === "check" && !s.structure_confirmed_at) ||
-      (show === "waiting" && s.open_requests > 0));
+      (show === "waiting" && s.open_requests + s.open_reviews > 0));
   const schoolList = liveSchools.filter(keep);
   const prospects = prospectSchools.filter(keep);
   const chips: Array<{ key: Show; label: string; n: number }> = [
@@ -78,7 +79,7 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
     { key: "live", label: t.prospects.live, n: liveSchools.length },
     { key: "prospect", label: t.prospects.prospect, n: prospectSchools.length },
     { key: "check", label: t.prospects.unconfirmed, n: allSchools.filter((s) => !s.structure_confirmed_at).length },
-    { key: "waiting", label: t.directory.waitingOnYou, n: allSchools.filter((s) => s.open_requests > 0).length },
+    { key: "waiting", label: t.directory.waitingOnYou, n: allSchools.filter((s) => s.open_requests + s.open_reviews > 0).length },
   ];
   const chipHref = (key: Show) => {
     const sp = new URLSearchParams();
@@ -196,9 +197,14 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
                     <dd className="num font-display text-xl font-semibold text-slate-900">{sc.users}</dd>
                   </div>
                 </dl>
-                {sc.structure_confirmed_at ? null : (
-                  <p className="mt-3 self-start">
-                    <Badge tone="warn">{t.prospects.unconfirmed}</Badge>
+                {sc.structure_confirmed_at && !sc.open_reviews ? null : (
+                  <p className="mt-3 flex flex-wrap gap-1.5 self-start">
+                    {sc.structure_confirmed_at ? null : <Badge tone="warn">{t.prospects.unconfirmed}</Badge>}
+                    {sc.open_reviews ? (
+                      <Badge tone="danger">
+                        {sc.open_reviews === 1 ? t.review.waitingOne : fmt(t.review.waitingMany, { n: sc.open_reviews })}
+                      </Badge>
+                    ) : null}
                   </p>
                 )}
                 {sc.open_requests ? (
@@ -235,9 +241,14 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
                     <span className="mt-0.5 block text-[13px] text-slate-500">
                       {fmt(t.prospects.size, { f: sc.faculties, d: sc.departments })} · {sc.default_locale.toUpperCase()}
                     </span>
-                    {sc.structure_confirmed_at ? null : (
-                      <span className="mt-2 block">
-                        <Badge tone="warn">{t.prospects.unconfirmed}</Badge>
+                    {sc.structure_confirmed_at && !sc.open_reviews ? null : (
+                      <span className="mt-2 flex flex-wrap gap-1.5">
+                        {sc.structure_confirmed_at ? null : <Badge tone="warn">{t.prospects.unconfirmed}</Badge>}
+                        {sc.open_reviews ? (
+                          <Badge tone="danger">
+                            {sc.open_reviews === 1 ? t.review.waitingOne : fmt(t.review.waitingMany, { n: sc.open_reviews })}
+                          </Badge>
+                        ) : null}
                       </span>
                     )}
                   </span>

@@ -434,6 +434,47 @@ check('the join page shows the university’s look',
   (await as(null, `select public.invitation_preview($1) as p`, [regToken], 'anon')).rows[0].p.logo_path === `${inst}/logo-1.png`);
 check('the master dashboard carries it', (await one('P', `select short_name, logo_path from public.platform_schools() where id = $1`, [inst])).short_name === 'UT');
 
+// --- A link for the university to check its structure, without an account ------------------
+await as('P', `select public.set_structure_confirmed($1, false)`, [inst]);
+await expectError('only the Ardoise team makes a structure-check link',
+  () => as('AD', `select public.create_structure_review($1)`, [inst]), 'forbidden');
+const reviewToken = (await one('P', `select public.create_structure_review($1) as t`, [inst])).t;
+const opened = (await as(null, `select public.structure_review_open($1) as r`, [reviewToken], 'anon')).rows[0].r;
+const firstUnit = opened.units[0];
+const someDept = opened.units.flatMap((u) => u.departments)[0];
+check('anyone with the link sees the university and its whole structure',
+  opened.status === 'open' && opened.institution === 'Université Test' && opened.units.length >= 1 && !!someDept);
+check('a wrong link shows nothing', (await as(null, `select public.structure_review_open('nope') as r`, [], 'anon')).rows[0].r === null);
+check('the team sees when the link was opened',
+  (await one('P', `select opened_at from public.structure_reviews where token = $1`, [reviewToken])).opened_at !== null);
+const answered = (await as(null, `select public.structure_review_answer($1, 'Mrs Registrar', 'Registrar', true, $2::uuid[], $3::jsonb, '') as v`,
+  [reviewToken, [someDept.id, '00000000-0000-0000-0000-00000000dead'], JSON.stringify([{ unit: firstUnit.id, text: 'Department of Nursing' }])], 'anon')).rows[0].v;
+check('ticking something makes it a correction, even when “correct” was pressed', answered === 'changes');
+const ans = await one('P', `select flagged, missing, handled_at from public.structure_review_answers order by created_at desc limit 1`);
+check('the correction names what is wrong and what is missing (items of other universities are ignored)',
+  ans.flagged.length === 1 && ans.flagged[0].name === someDept.name && ans.missing[0].text === 'Department of Nursing'
+  && ans.missing[0].unit === firstUnit.name && ans.handled_at === null);
+check('…the structure stays unchecked', (await one('P', `select structure_confirmed_at from public.institutions where id = $1`, [inst])).structure_confirmed_at === null);
+check('…and the master dashboard counts it as waiting', (await one('P', `select open_reviews from public.platform_schools() where id = $1`, [inst])).open_reviews === 1);
+check('nobody outside the team reads the answers', (await count('AD', `select count(*) n from public.structure_review_answers`)) === 0);
+await expectError('a name is needed to answer',
+  () => as(null, `select public.structure_review_answer($1, ' ', '', true)`, [reviewToken], 'anon'), 'invalid');
+// A signed-in teacher of the university opening the link on their own browser can still confirm.
+check('confirming with nothing ticked marks the structure checked',
+  (await one('T', `select public.structure_review_answer($1, 'Mrs Registrar', 'Registrar', true) as v`, [reviewToken])).v === 'confirmed'
+  && (await one('P', `select structure_confirmed_at from public.institutions where id = $1`, [inst])).structure_confirmed_at !== null);
+await as('P', `select public.set_structure_confirmed($1, false)`, [inst]);
+await as('T', `update public.institutions set structure_confirmed_at = now() where id = $1`, [inst]);
+check('…but nobody else can mark it checked directly',
+  (await one('P', `select structure_confirmed_at from public.institutions where id = $1`, [inst])).structure_confirmed_at === null);
+await as('P', `select public.set_structure_confirmed($1, true)`, [inst]);
+const reviewId = (await one('P', `select id from public.structure_reviews where token = $1`, [reviewToken])).id;
+await as('P', `select public.revoke_structure_review($1)`, [reviewId]);
+check('a withdrawn link shows no structure',
+  (await as(null, `select public.structure_review_open($1) as r`, [reviewToken], 'anon')).rows[0].r.status === 'revoked');
+await expectError('…and takes no answer',
+  () => as(null, `select public.structure_review_answer($1, 'Someone', '', true)`, [reviewToken], 'anon'), 'invalid');
+
 // --- Two-step login, enforced by the database ------------------------------------------------
 const status = async (user) => (await one(user, `select public.account_status() as s`)).s;
 const tTeaches = await count('T', `select count(*) n from public.enrollments where user_id = $1`, [ids.T]);
