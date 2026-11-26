@@ -17,6 +17,8 @@ import {
   makeCurrent,
   markSupportDone,
   removeItem,
+  setSchoolStatus,
+  setStructureConfirmed,
   updateDepartment,
   updateProgramme,
   updateUnit,
@@ -33,7 +35,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
   if (!isPlatformAdmin) notFound();
   const { slug } = await params;
   const sp = await searchParams;
-  const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale").eq("slug", slug).maybeSingle();
+  const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale, status, structure_source, structure_confirmed_at").eq("slug", slug).maybeSingle();
   if (!school) notFound();
 
   const [structure, { data: reqs }, { data: allStats }, { data: office }] = await Promise.all([
@@ -178,6 +180,18 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
   };
 
   const current = years.find((y) => y.is_current) ?? years[0];
+  const isLive = school.status === "live";
+  const sources = String(school.structure_source ?? "")
+    .split(/\s+/)
+    .filter((u) => /^https?:\/\//.test(u))
+    .map((u) => {
+      try {
+        return { url: u, host: new URL(u).hostname.replace(/^www\./, "") };
+      } catch {
+        return null;
+      }
+    })
+    .filter((x): x is { url: string; host: string } => x !== null);
 
   return (
     <>
@@ -185,7 +199,10 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
         <ArrowLeft size={15} aria-hidden />
         {t.structure.backToConsole}
       </Link>
-      <PageHeader title={school.name} subtitle={`/join/${school.slug} · ${t.master.role}`} />
+      <PageHeader
+        title={school.name}
+        subtitle={`/join/${school.slug} · ${isLive ? t.prospects.live : t.prospects.prospect}`}
+      />
       <Flash error={error} ok={ok} />
       {stats.length ? (
         <dl className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:max-w-3xl">
@@ -213,6 +230,58 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
         </div>
 
         <div className="space-y-6">
+          <Card id="status" className="scroll-mt-6">
+            <CardHeader
+              title={t.prospects.status}
+              action={<Badge tone={isLive ? "success" : "neutral"}>{isLive ? t.prospects.live : t.prospects.prospect}</Badge>}
+            />
+            <div className="space-y-4 px-5 py-4">
+              <p className="text-[14px] text-slate-600">{isLive ? t.prospects.liveHelp : t.prospects.prospectHelp}</p>
+              <form action={setSchoolStatus}>
+                {common}
+                <input type="hidden" name="status" value={isLive ? "prospect" : "live"} />
+                <Button type="submit" size="sm" variant={isLive ? "secondary" : "primary"}>
+                  {isLive ? t.prospects.close : t.prospects.open}
+                </Button>
+              </form>
+              <div className="border-t border-slate-100 pt-4">
+                <p className="mb-1 flex flex-wrap items-center gap-2 text-[14.5px] font-semibold text-slate-900">
+                  {t.prospects.structure}
+                  {school.structure_confirmed_at ? (
+                    <Badge tone="success">
+                      {fmt(t.prospects.confirmedOn, { date: formatDate(locale, school.structure_confirmed_at) })}
+                    </Badge>
+                  ) : (
+                    <Badge tone="warn">{t.prospects.unconfirmed}</Badge>
+                  )}
+                </p>
+                {school.structure_confirmed_at ? null : (
+                  <p className="text-[14px] text-slate-600">{t.prospects.unconfirmedHelp}</p>
+                )}
+                {sources.length ? (
+                  <p className="mt-2 text-[13px] text-slate-500">
+                    {t.prospects.sources}:{" "}
+                    {sources.map((x, i) => (
+                      <span key={x.url}>
+                        {i ? ", " : ""}
+                        <a href={x.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-600 hover:underline">
+                          {x.host}
+                        </a>
+                      </span>
+                    ))}
+                  </p>
+                ) : null}
+                <form action={setStructureConfirmed} className="mt-3">
+                  {common}
+                  <input type="hidden" name="confirmed" value={school.structure_confirmed_at ? "0" : "1"} />
+                  <Button type="submit" size="sm" variant="secondary">
+                    {school.structure_confirmed_at ? t.prospects.unconfirm : t.prospects.confirm}
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </Card>
+
           <Card>
             <CardHeader title={t.master.office} />
             {people.length ? (

@@ -21,6 +21,32 @@ function done(back: string, anchor: string, extra = "ok=1"): never {
   redirect(`${back}?${extra}#${anchor}`);
 }
 
+/** Open a university to students, or take it back to preparation. */
+export async function setSchoolStatus(formData: FormData) {
+  const back = page(formData);
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("set_institution_status", {
+    p_institution: str(formData, "institution_id", 40),
+    p_status: formData.get("status") === "live" ? "live" : "prospect",
+  });
+  if (error) redirect(`${back}?error=${errorCode(error)}#status`);
+  revalidatePath("/platform");
+  done(back, "status");
+}
+
+/** The registrar has checked the structure (or it needs checking again). */
+export async function setStructureConfirmed(formData: FormData) {
+  const back = page(formData);
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("set_structure_confirmed", {
+    p_institution: str(formData, "institution_id", 40),
+    p_confirmed: formData.get("confirmed") === "1",
+  });
+  if (error) redirect(`${back}?error=${errorCode(error)}#status`);
+  revalidatePath("/platform");
+  done(back, "status");
+}
+
 export async function importOutline(formData: FormData) {
   const back = page(formData);
   const units = parseOutline(String(formData.get("outline") ?? "").slice(0, 100_000));

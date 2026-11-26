@@ -19,6 +19,16 @@ check('the platform admin is not a member of the school', (await count('P', `sel
 check('the platform admin can list schools', (await count('P', `select count(*) n from public.institutions`)) >= 1);
 check('an outsider cannot see the school', (await count('Z', `select count(*) n from public.institutions where id = $1`, [inst])) === 0);
 
+// A new university starts as a prospect: prepared by the Ardoise team, closed to the public.
+check('a new university starts as a prospect', (await one('P', `select status from public.institutions where id = $1`, [inst])).status === 'prospect');
+check('a prospect is not in the sign-up list',
+  !(await as(null, `select * from public.school_directory()`, [], 'anon')).rows.some((s) => s.slug === 'ut'));
+check('students cannot join a prospect with a matricule (it answers like an unknown university)',
+  (await one('S4', `select public.claim_matricule('ut', 'X1', 'Someone') as r`)).r.status === 'school_not_found');
+check('…and no claim is left waiting for it', (await db.query(`select count(*)::int n from public.matricule_claims where institution_id = $1`, [inst])).rows[0].n === 0);
+await expectError('only the Ardoise team opens a university', () => as('Z', `select public.set_institution_status($1, 'live')`, [inst]), 'forbidden');
+await as('P', `select public.set_institution_status($1, 'live')`, [inst]);
+
 const directory = (await as(null, `select * from public.school_directory()`, [], 'anon')).rows;
 check('anyone can list schools by name and link (nothing else)',
   directory.some((s) => s.slug === 'ut' && s.name === 'Université Test') && Object.keys(directory[0]).join() === 'slug,name');
@@ -376,6 +386,20 @@ await as('P', `select public.remove_teammate($1)`, [ids.Q1]);
 check('removing a manager moves their people up a level',
   (await one('P', `select reports_to from public.platform_team() where user_id = $1`, [ids.Q2])).reports_to === ids.P);
 check('a removed teammate reads no team messages', (await count('Q1', `select count(*) n from public.team_messages`)) === 0);
+
+// --- Prospects: the university's own administrators cannot open or close it ------------------
+await expectError('a university administrator cannot change whether it is open',
+  () => as('AD', `update public.institutions set status = 'prospect' where id = $1`, [inst]), 'forbidden');
+await expectError('…nor mark its structure as checked',
+  () => as('AD', `update public.institutions set structure_confirmed_at = now() where id = $1`, [inst]), 'forbidden');
+await as('AD', `update public.institutions set name = 'Université Test' where id = $1`, [inst]);
+check('…but still edits its name and settings', (await one('P', `select status from public.institutions where id = $1`, [inst])).status === 'live');
+await expectError('only the Ardoise team marks a structure checked', () => as('AD', `select public.set_structure_confirmed($1, true)`, [inst]), 'forbidden');
+await as('P', `select public.set_structure_confirmed($1, false)`, [inst]);
+const card = (await as('P', `select * from public.platform_schools() where id = $1`, [inst])).rows[0];
+check('the master dashboard shows status, whether the structure is checked, and its size',
+  card.status === 'live' && card.structure_confirmed_at === null && card.faculties >= 1 && card.departments >= 1);
+await as('P', `select public.set_structure_confirmed($1, true)`, [inst]);
 
 // --- Two-step login, enforced by the database ------------------------------------------------
 const status = async (user) => (await one(user, `select public.account_status() as s`)).s;

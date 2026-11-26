@@ -8,7 +8,7 @@ A learning platform for Cameroonian universities, in the spirit of Canvas and Bl
 ardoise-lms/
 ├── supabase/
 │   ├── migrations/   # run in filename order
-│   ├── seed/         # demo.sql, demo-engage.sql, demo-roles.sql; uba.sql + uba-demo.sql (University of Bamenda)
+│   ├── seed/         # demo.sql, demo-engage.sql, demo-roles.sql; uba.sql + uba-demo.sql (University of Bamenda); prospects.sql (14 universities in preparation)
 │   └── tests/        # 331 security and behaviour checks on a real Postgres engine (PGlite)
 ├── web/              # Next.js 16 web app (all roles); serves the phone preview at /app
 └── mobile/           # Expo SDK 58 phone app (students and teachers)
@@ -73,7 +73,7 @@ The defaults (pass 10/20, compensation on, CC 30 / TP 20 / exam 50, jury bonus u
 
 1. Create a project at supabase.com.
 2. **SQL Editor**: run every file in `supabase/migrations/` in filename order (or `supabase link` then `supabase db push`).
-3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`, then `supabase/seed/demo-roles.sql`. For presentations, `supabase/seed/uba.sql` loads the University of Bamenda's faculties, schools, departments and programmes, and `supabase/seed/uba-demo.sql` adds the university's administrator, a lecturer teaching in three departments and a student with a full load (with classmates, timetable and first week of work). It needs the password for those three accounts first, so it is never in the repository: `select set_config('ardoise.demo_password', '…', false);` then run the file.
+3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`, then `supabase/seed/demo-roles.sql`. For presentations, `supabase/seed/uba.sql` loads the University of Bamenda's faculties, schools, departments and programmes, and `supabase/seed/uba-demo.sql` adds the university's administrator, a lecturer teaching in three departments and a student with a full load (with classmates, timetable and first week of work). It needs the password for those three accounts first, so it is never in the repository: `select set_config('ardoise.demo_password', '…', false);` then run the file. `supabase/seed/prospects.sql` prepares 14 more universities as private prospects (structure only, taken from public sources and marked to check): the Ardoise team opens each one from its console page once it signs.
 4. Give the Ardoise team access to the console: sign up once on the web app, then in the SQL Editor run `insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';`
 5. **Authentication → URL Configuration**: Site URL = your web address (e.g. `https://ardoise-pi.vercel.app`); add `<site>/**` to Redirect URLs. Without this, sign-up and password emails point to localhost.
 6. **Emails**: the built-in sender is for testing only (a handful of emails an hour, often spam). Before real students sign up, follow `supabase/templates/README.md`: your own sender (SMTP), a higher hourly limit, and Ardoise's bilingual templates, whose links work on any device.

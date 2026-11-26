@@ -37,9 +37,10 @@ export default async function StructurePage({ searchParams }: PageProps<"/admin/
   const mapQuery = typeof mq === "string" ? mq.trim().slice(0, 40) : "";
   const inst = institution.id;
 
-  const [structure, reqs] = await Promise.all([
+  const [structure, reqs, { data: state }] = await Promise.all([
     loadStructure(supabase, inst),
     supabase.from("support_requests").select("id", { count: "exact", head: true }).eq("institution_id", inst).is("handled_at", null),
+    supabase.from("institutions").select("status, structure_confirmed_at").eq("id", inst).maybeSingle(),
   ]);
   const { units, departments, programmes, years, semesters, ues } = structure;
   // Official results only: courses are attached to teaching units, a few at a time, by search.
@@ -57,6 +58,7 @@ export default async function StructurePage({ searchParams }: PageProps<"/admin/
   }
   const openRequests = reqs.count ?? 0;
   const empty = !units.length && !departments.length;
+  const toCheck = !empty && state != null && !state.structure_confirmed_at;
 
   const yearLabel = (id: string) => years.find((y) => y.id === id)?.label ?? "";
   const semLabel = (id: string | null) => {
@@ -77,9 +79,20 @@ export default async function StructurePage({ searchParams }: PageProps<"/admin/
 
       <div className="grid items-start gap-6 xl:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-6">
-          <p className="rounded-xl bg-paper px-4 py-3 text-[15px] text-slate-700 ring-1 ring-slate-200">
-            {empty ? t.structure.empty : t.structure.byArdoise}
-          </p>
+          {toCheck ? (
+            <div className="rounded-xl bg-ochre-50 px-4 py-3.5 text-[15px] text-slate-800 ring-1 ring-ochre-200">
+              <p className="font-semibold text-ochre-800">{t.prospects.bannerTitle}</p>
+              <p className="mt-1">{t.prospects.bannerBody}</p>
+              {state?.status === "prospect" ? <p className="mt-1 text-slate-600">{t.prospects.bannerClosed}</p> : null}
+              <Link href="/admin/requests" className="mt-2 inline-block font-semibold text-brand-700 hover:underline">
+                {t.prospects.bannerAction}
+              </Link>
+            </div>
+          ) : (
+            <p className="rounded-xl bg-paper px-4 py-3 text-[15px] text-slate-700 ring-1 ring-slate-200">
+              {empty ? t.structure.empty : t.structure.byArdoise}
+            </p>
+          )}
           {empty ? null : <StructureTree structure={structure} t={t} />}
         </div>
 

@@ -7,7 +7,7 @@ import { fmt } from "@/lib/i18n/messages-engage";
 import { formatDate } from "@/lib/format";
 import { siteOrigin } from "@/lib/site";
 import { NDOP_CHALK } from "@/lib/ndop";
-import { Button, Card, Empty, Field, Flash, Input, Select } from "@/components/ui";
+import { Badge, Button, Card, Empty, Field, Flash, Input, Select } from "@/components/ui";
 import { ShareLink } from "@/components/copy-button";
 import { createSchool } from "./actions";
 
@@ -22,6 +22,11 @@ type School = {
   staff: number;
   users: number;
   open_requests: number;
+  status: "live" | "prospect";
+  structure_confirmed_at: string | null;
+  structure_source: string;
+  faculties: number;
+  departments: number;
 };
 
 /** The master dashboard: every university and its few numbers that matter, and new universities. */
@@ -44,11 +49,17 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     siteOrigin(),
   ]);
-  const schoolList = (schools ?? []) as School[];
-  const schoolName = new Map(schoolList.map((s) => [s.id, s.name]));
+  const allSchools = (schools ?? []) as School[];
+  const schoolList = allSchools.filter((s) => s.status === "live");
+  const prospects = allSchools.filter((s) => s.status === "prospect");
+  const schoolName = new Map(allSchools.map((s) => [s.id, s.name]));
   const sum = (k: keyof School) => schoolList.reduce((n, x) => n + Number(x[k] ?? 0), 0);
   const stats = [
-    { label: t.master.statSchools, value: schoolList.length },
+    {
+      label: t.master.statSchools,
+      value: schoolList.length,
+      suffix: prospects.length ? fmt(t.prospects.inPrep, { n: prospects.length }) : undefined,
+    },
     { label: t.master.statStudents, value: sum("students_joined"), suffix: fmt(t.master.onList, { n: sum("students_listed") }) },
     { label: t.master.users, value: userCount ?? 0 },
   ];
@@ -117,6 +128,11 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
                     <dd className="num font-display text-xl font-semibold text-slate-900">{sc.users}</dd>
                   </div>
                 </dl>
+                {sc.structure_confirmed_at ? null : (
+                  <p className="mt-3 self-start">
+                    <Badge tone="warn">{t.prospects.unconfirmed}</Badge>
+                  </p>
+                )}
                 {sc.open_requests ? (
                   <p className="mt-3 inline-flex items-center gap-1.5 self-start rounded-full bg-ochre-50 px-3 py-1 text-[13px] font-semibold text-ochre-700 ring-1 ring-ochre-100">
                     <MessageSquareText size={14} aria-hidden />
@@ -132,6 +148,36 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
           </Card>
         )}
       </section>
+
+      {prospects.length > 0 ? (
+        <section className="mb-8">
+          <h2 className="font-display text-2xl font-semibold">{t.prospects.title}</h2>
+          <p className="mb-4 max-w-2xl text-[14.5px] text-slate-600">{t.prospects.intro}</p>
+          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {prospects.map((sc) => (
+              <li key={sc.id}>
+                <Link
+                  href={`/platform/${sc.slug}`}
+                  className="group flex h-full items-start justify-between gap-3 rounded-[var(--radius-card)] border border-dashed border-slate-300 bg-paper/60 px-4 py-3.5 transition-colors hover:border-ardoise hover:bg-paper"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-semibold leading-snug text-slate-900">{sc.name}</span>
+                    <span className="mt-0.5 block text-[13px] text-slate-500">
+                      {fmt(t.prospects.size, { f: sc.faculties, d: sc.departments })} · {sc.default_locale.toUpperCase()}
+                    </span>
+                    {sc.structure_confirmed_at ? null : (
+                      <span className="mt-2 block">
+                        <Badge tone="warn">{t.prospects.unconfirmed}</Badge>
+                      </span>
+                    )}
+                  </span>
+                  <ArrowRight size={16} className="mt-1 shrink-0 text-slate-300 transition-colors group-hover:text-ardoise" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {ownerLinks.length > 0 ? (
         <Card className="mb-6 border-ochre-200 bg-ochre-50/60 p-5">
@@ -151,7 +197,7 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
         </Card>
       ) : null}
 
-      <details className="group max-w-2xl rounded-[var(--radius-card)] border border-slate-200 bg-paper" open={schoolList.length === 0}>
+      <details className="group max-w-2xl rounded-[var(--radius-card)] border border-slate-200 bg-paper" open={allSchools.length === 0}>
         <summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 font-display text-lg font-semibold text-slate-900 [&::-webkit-details-marker]:hidden">
           <Plus size={18} aria-hidden className="text-brand-600 transition-transform group-open:rotate-45" />
           {t.platform.newSchool}
@@ -169,6 +215,12 @@ export default async function PlatformPage({ searchParams }: PageProps<"/platfor
                 <Select name="locale" defaultValue="en">
                   <option value="en">English</option>
                   <option value="fr">Français</option>
+                </Select>
+              </Field>
+              <Field label={t.prospects.startAs}>
+                <Select name="status" defaultValue="prospect">
+                  <option value="prospect">{t.prospects.startProspect}</option>
+                  <option value="live">{t.prospects.startLive}</option>
                 </Select>
               </Field>
               <Field label={t.platform.ownerName}>

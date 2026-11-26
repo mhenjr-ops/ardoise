@@ -18,6 +18,7 @@ export async function createSchool(formData: FormData) {
     p_default_locale: formData.get("locale") === "fr" ? "fr" : "en",
     p_owner_email: field(formData, "owner_email", 320),
     p_owner_name: field(formData, "owner_name", 200),
+    p_status: formData.get("status") === "live" ? "live" : "prospect",
   });
   if (error) redirect(`/platform?error=${error.code === "23505" ? "slug_taken" : error.message.includes("forbidden") ? "forbidden" : "generic"}`);
   revalidatePath("/platform");
