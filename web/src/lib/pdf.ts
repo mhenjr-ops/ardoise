@@ -1,9 +1,10 @@
 import "server-only";
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import QRCode from "qrcode";
 import type { Locale, Messages } from "@/lib/i18n/messages";
 import type { Decision, UEResult } from "@/lib/lmd";
 import { formatDate, formatScore } from "@/lib/format";
+import type { DraftTranscript } from "@/lib/draft-transcript";
 
 const A4_PORTRAIT: [number, number] = [595.28, 841.89];
 const A4_LANDSCAPE: [number, number] = [841.89, 595.28];
@@ -279,6 +280,46 @@ export async function buildPvPdf(input: PvInput): Promise<Uint8Array> {
   return doc.save();
 }
 
+/** The UE / course table shared by the official and the draft transcript. */
+function transcriptTable(w: Writer, t: Messages, locale: Locale, ueResults: UEResult[]) {
+  const columns: Column[] = [
+    { header: "Code", width: 62 },
+    { header: locale === "fr" ? "Unité d'enseignement / élément" : "Teaching unit / course", width: w.width - 62 - 46 - 40 - 56 - 92 },
+    { header: t.lmd.credits, width: 46, align: "center" },
+    { header: t.lmd.coefficient, width: 40, align: "center" },
+    { header: "/20", width: 56, align: "right" },
+    { header: locale === "fr" ? "Résultat" : "Result", width: 92 },
+  ];
+  const rows: Cell[][] = [];
+  const shade = new Set<number>();
+  for (const ue of ueResults) {
+    shade.add(rows.length);
+    rows.push([
+      { text: ue.code, bold: true },
+      { text: ue.title, bold: true },
+      { text: String(ue.credits), bold: true },
+      { text: "" },
+      {
+        text: ue.final === null ? "—" : `${formatScore(locale, ue.final)}${ue.bonus ? "*" : ""}`,
+        bold: true,
+        color: statusColor(ue.status),
+      },
+      { text: t.lmd.ueStatus[ue.status], bold: true, color: statusColor(ue.status) },
+    ]);
+    for (const c of ue.courses) {
+      rows.push([
+        { text: c.code, color: MUTED },
+        { text: c.title, indent: 10 },
+        { text: "" },
+        { text: formatScore(locale, c.coefficient) },
+        { text: formatScore(locale, c.mark) },
+        { text: "" },
+      ]);
+    }
+  }
+  return { columns, rows, shade };
+}
+
 export type TranscriptPayload = {
   institution: string;
   student_name: string;
@@ -333,41 +374,7 @@ export async function buildTranscriptPdf(input: {
   }
   w.y = Math.min(w.y, w.size[1] - MARGIN - qrSize - 10) - 8;
 
-  const columns: Column[] = [
-    { header: "Code", width: 62 },
-    { header: locale === "fr" ? "Unité d'enseignement / élément" : "Teaching unit / course", width: w.width - 62 - 46 - 40 - 56 - 92 },
-    { header: t.lmd.credits, width: 46, align: "center" },
-    { header: t.lmd.coefficient, width: 40, align: "center" },
-    { header: "/20", width: 56, align: "right" },
-    { header: locale === "fr" ? "Résultat" : "Result", width: 92 },
-  ];
-  const rows: Cell[][] = [];
-  const shade = new Set<number>();
-  for (const ue of p.ue_results) {
-    shade.add(rows.length);
-    rows.push([
-      { text: ue.code, bold: true },
-      { text: ue.title, bold: true },
-      { text: String(ue.credits), bold: true },
-      { text: "" },
-      {
-        text: ue.final === null ? "—" : `${formatScore(locale, ue.final)}${ue.bonus ? "*" : ""}`,
-        bold: true,
-        color: statusColor(ue.status),
-      },
-      { text: t.lmd.ueStatus[ue.status], bold: true, color: statusColor(ue.status) },
-    ]);
-    for (const c of ue.courses) {
-      rows.push([
-        { text: c.code, color: MUTED },
-        { text: c.title, indent: 10 },
-        { text: "" },
-        { text: formatScore(locale, c.coefficient) },
-        { text: formatScore(locale, c.mark) },
-        { text: "" },
-      ]);
-    }
-  }
+  const { columns, rows, shade } = transcriptTable(w, t, locale, p.ue_results);
   w.table(columns, rows, 8.5, shade);
   if (p.ue_results.some((u) => u.bonus)) w.text(`* ${t.lmd.jury}`, { size: 7.5, color: MUTED });
 
@@ -395,5 +402,143 @@ export async function buildTranscriptPdf(input: {
     8.5,
   );
   w.footer(`${p.institution} · ${p.student_name} · ${input.code}`);
+  return doc.save();
+}
+
+
+const DRAFT_RED = rgb(0.69, 0.16, 0.1);
+const DRAFT_TINT = rgb(0.99, 0.95, 0.92);
+
+/**
+ * Draft transcript: the student's marks so far, per semester of their year. Stamped
+ * PROVISOIRE / DRAFT across every page, with no verification code: it proves nothing and
+ * says so. Semesters the jury has published show the official result.
+ */
+export async function buildDraftTranscriptPdf(input: {
+  t: Messages;
+  locale: Locale;
+  draft: DraftTranscript;
+  generatedAt: string;
+}): Promise<Uint8Array> {
+  const { t, locale, draft: p } = input;
+  const fr = locale === "fr";
+  const stamp = fr ? "PROVISOIRE" : "DRAFT";
+  const doc = await PDFDocument.create();
+  doc.setTitle(`${fr ? "Relevé de notes provisoire" : "Draft transcript"} — ${p.student_name}`);
+  doc.setProducer("Ardoise");
+  const f = await fonts(doc);
+  const w = new Writer(doc, f, A4_PORTRAIT);
+
+  // Banner first, so nobody mistakes it for the real thing even on a cropped photo.
+  const bannerLines = wrap(
+    f.safe(
+      fr
+        ? "Document non officiel. Les notes peuvent encore changer jusqu'à la délibération du jury. Ce relevé ne peut pas être vérifié et ne remplace pas le relevé officiel délivré par l'établissement."
+        : "Not an official document. Marks may still change until the jury's deliberation. This transcript cannot be verified and does not replace the official transcript issued by the university.",
+    ),
+    f.regular,
+    8.5,
+    w.width - 24,
+  );
+  const bannerH = 26 + bannerLines.length * 11.5;
+  w.page.drawRectangle({ x: MARGIN, y: w.y - bannerH, width: w.width, height: bannerH, color: DRAFT_TINT, borderColor: DRAFT_RED, borderWidth: 1 });
+  w.page.drawText(f.safe(fr ? "RELEVÉ PROVISOIRE · NON OFFICIEL" : "DRAFT TRANSCRIPT · NOT OFFICIAL"), {
+    x: MARGIN + 12, y: w.y - 17, size: 10, font: f.bold, color: DRAFT_RED,
+  });
+  bannerLines.forEach((line, i) => {
+    w.page.drawText(line, { x: MARGIN + 12, y: w.y - 31 - i * 11.5, size: 8.5, font: f.regular, color: INK });
+  });
+  w.y -= bannerH + 16;
+
+  w.text(p.institution.toUpperCase(), { size: 11, bold: true, color: MUTED });
+  w.text(fr ? "RELEVÉ DE NOTES PROVISOIRE" : "DRAFT TRANSCRIPT", { size: 18, bold: true, gap: 10 });
+  const facts: Array<[string, string]> = [
+    [t.lmd.student, p.student_name],
+    ...(p.matricule ? ([[fr ? "Matricule" : "Student ID", p.matricule]] as Array<[string, string]>) : []),
+    [t.common.email, p.student_email],
+    [t.lmd.programme, p.programme_code ? `${p.programme} (${p.programme_code})` : p.programme],
+    [t.lmd.level, p.level],
+    [fr ? "Année" : "Year", p.academic_year],
+  ];
+  for (const [k, v] of facts) {
+    w.page.drawText(f.safe(k), { x: MARGIN, y: w.y - 9.5, size: 9, font: f.regular, color: MUTED });
+    w.page.drawText(f.safe(fit(v, f.bold, 10, w.width - 110)), { x: MARGIN + 100, y: w.y - 10, size: 10, font: f.bold, color: INK });
+    w.y -= 15;
+  }
+  w.y -= 8;
+
+  if (p.semesters.length === 0) {
+    w.paragraph(
+      fr
+        ? "Aucune unité d'enseignement n'est encore rattachée à votre parcours pour cette année."
+        : "No teaching units are linked to your programme for this year yet.",
+      10,
+      INK,
+    );
+  }
+
+  for (const sem of p.semesters) {
+    w.ensure(90);
+    w.y -= 4;
+    const tag = sem.official
+      ? `${fr ? "Officiel · publié le" : "Official · published"} ${sem.published_at ? formatDate(locale, sem.published_at) : ""}`.trim()
+      : fr
+        ? "Provisoire · notes à ce jour"
+        : "Draft · marks so far";
+    w.page.drawText(f.safe(`${t.lmd.semester} ${sem.label}`), { x: MARGIN, y: w.y - 13, size: 13, font: f.bold, color: INK });
+    const tagW = f.bold.widthOfTextAtSize(f.safe(tag), 8.5);
+    w.page.drawText(f.safe(tag), {
+      x: MARGIN + w.width - tagW, y: w.y - 12, size: 8.5, font: f.bold, color: sem.official ? BRAND : DRAFT_RED,
+    });
+    w.y -= 22;
+
+    const { columns, rows, shade } = transcriptTable(w, t, locale, sem.ue_results);
+    w.table(columns, rows, 8.5, shade);
+    if (sem.ue_results.some((u) => u.bonus)) w.text(`* ${t.lmd.jury}`, { size: 7.5, color: MUTED });
+
+    w.ensure(56);
+    w.page.drawRectangle({ x: MARGIN, y: w.y - 44, width: w.width, height: 44, color: SHADE });
+    const third = w.width / 3;
+    const prefix = sem.official ? "" : fr ? " (prov.)" : " (draft)";
+    const summary: Array<[string, string]> = [
+      [`${t.lmd.average}${prefix}`, `${formatScore(locale, sem.semester_average)} /20`],
+      [t.lmd.credits, `${sem.credits_earned} / ${sem.credits_total}`],
+      [`${t.lmd.decision}${prefix}`, t.lmd.decisions[sem.decision]],
+    ];
+    summary.forEach(([k, v], i) => {
+      w.page.drawText(f.safe(k), { x: MARGIN + 12 + i * third, y: w.y - 16, size: 8, font: f.regular, color: MUTED });
+      const color = i < 2 ? INK : sem.decision === "resit" ? rgb(0.73, 0.11, 0.11) : sem.decision === "incomplete" ? MUTED : BRAND;
+      w.page.drawText(f.safe(fit(v, f.bold, 12, third - 20)), { x: MARGIN + 12 + i * third, y: w.y - 33, size: 12, font: f.bold, color });
+    });
+    w.y -= 58;
+  }
+
+  w.ensure(40);
+  w.text(`${fr ? "Généré le" : "Generated on"} ${formatDate(locale, input.generatedAt)}`, { size: 9 });
+  w.paragraph(
+    fr
+      ? "Une matière sans note compte comme « incomplète » ; une note manquante dans un devoir publié compte 0, comme lors de la délibération."
+      : "A course with no mark counts as incomplete; a missing mark on published work counts as 0, as in the deliberation.",
+    8,
+  );
+  w.footer(`${p.institution} · ${p.student_name} · ${stamp}`);
+
+  // The stamp across every page, on top of everything, light enough to read through.
+  const stampSize = 88;
+  for (const page of doc.getPages()) {
+    const { width, height } = page.getSize();
+    const textW = f.bold.widthOfTextAtSize(stamp, stampSize);
+    const angle = 35;
+    const rad = (angle * Math.PI) / 180;
+    page.drawText(stamp, {
+      x: width / 2 - (Math.cos(rad) * textW) / 2 + (Math.sin(rad) * stampSize) / 3,
+      y: height / 2 - (Math.sin(rad) * textW) / 2 - (Math.cos(rad) * stampSize) / 3,
+      size: stampSize,
+      font: f.bold,
+      color: DRAFT_RED,
+      opacity: 0.1,
+      rotate: degrees(angle),
+    });
+  }
   return doc.save();
 }

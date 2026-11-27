@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { FileDown } from "lucide-react";
+import { FileDown, FileClock } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { getI18n } from "@/lib/i18n/server";
 import { formatDate, formatScore } from "@/lib/format";
@@ -36,7 +36,7 @@ const tone: Record<Decision, "brand" | "info" | "danger" | "neutral"> = {
 
 export default async function ResultsPage() {
   const [{ supabase, user }, { t, locale }] = await Promise.all([getSession(), getI18n()]);
-  const [{ data }, { data: tr }] = await Promise.all([
+  const [{ data }, { data: tr }, { count: registrations }] = await Promise.all([
     supabase
       .from("deliberation_results")
       .select(
@@ -44,6 +44,7 @@ export default async function ResultsPage() {
       )
       .eq("student_id", user.id),
     supabase.from("transcripts").select("id, deliberation_id").eq("student_id", user.id),
+    supabase.from("programme_enrollments").select("id", { count: "exact", head: true }).eq("student_id", user.id),
   ]);
   const rows = ((data ?? []) as unknown as Row[]).sort((a, b) =>
     String(one(b.deliberation)?.published_at ?? "").localeCompare(String(one(a.deliberation)?.published_at ?? "")),
@@ -52,7 +53,18 @@ export default async function ResultsPage() {
 
   return (
     <>
-      <PageHeader title={t.lmd.myResults} />
+      <PageHeader
+        title={t.lmd.myResults}
+        subtitle={registrations ? t.lmd.draftTranscriptHelp : undefined}
+        action={
+          registrations ? (
+            <a href="/api/transcripts/draft" target="_blank" rel="noopener" className={buttonClass("secondary", "sm")}>
+              <FileClock size={14} aria-hidden />
+              {t.lmd.draftTranscript}
+            </a>
+          ) : null
+        }
+      />
       {rows.length === 0 ? (
         <Empty>{t.lmd.noResults}</Empty>
       ) : (

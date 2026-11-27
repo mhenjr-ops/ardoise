@@ -5,6 +5,7 @@ import { Ring } from '@/components/ndop';
 import { Text } from '@/components/text';
 import { Badge, Button, Card, Empty, Loading, Row, Screen, Slate, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import { openDraftTranscript } from '@/lib/draft-transcript';
 import { formatScore, useI18n } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
 import type { Decision, UEResult } from '@/lib/types';
@@ -34,6 +35,9 @@ export default function ResultsScreen() {
   const { session, loading } = useAuth();
   const { t, locale } = useI18n();
   const [rows, setRows] = useState<ResultRow[] | null>(null);
+  const [registered, setRegistered] = useState(false);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
   const userId = session?.user.id;
 
   const load = useCallback(async () => {
@@ -44,6 +48,11 @@ export default function ResultsScreen() {
         'deliberation_id, ue_results, semester_average, credits_earned, credits_total, decision, deliberation:deliberations(level, published_at, programme:programmes(name), semester:semesters(label, academic_year:academic_years(label)))',
       )
       .eq('student_id', userId);
+    const { count } = await supabase
+      .from('programme_enrollments')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_id', userId);
+    setRegistered((count ?? 0) > 0);
     const list = ((data ?? []) as unknown as ResultRow[]).sort((a, b) =>
       String(one(b.deliberation)?.published_at ?? '').localeCompare(String(one(a.deliberation)?.published_at ?? '')),
     );
@@ -58,9 +67,29 @@ export default function ResultsScreen() {
 
   if (loading || rows === null) return <Loading />;
 
+  async function draft() {
+    setDraftError(null);
+    setDraftBusy(true);
+    try {
+      const err = await openDraftTranscript(locale, t.draftTranscript);
+      if (err) setDraftError(err === 'not_registered' ? t.draftNotRegistered : err === 'offline' ? t.draftOffline : t.error);
+    } catch {
+      setDraftError(t.error);
+    } finally {
+      setDraftBusy(false);
+    }
+  }
+
   return (
     <>
       <Screen>
+        {registered ? (
+          <Card style={{ padding: 16, gap: 10 }}>
+            <Text style={st.draftHelp}>{t.draftTranscriptHelp}</Text>
+            <Button title={t.draftTranscript} variant="accent" onPress={draft} loading={draftBusy} />
+            {draftError ? <Text style={st.draftError}>{draftError}</Text> : null}
+          </Card>
+        ) : null}
         {rows.length === 0 ? <Empty text={t.noResults} /> : null}
         {rows.map((r) => {
           const d = one(r.deliberation);
@@ -134,5 +163,7 @@ const st = StyleSheet.create({
   decisionText: { fontFamily: fonts.heavy, fontSize: 15, color: '#12100C' },
   ue: { fontSize: 16, fontFamily: fonts.bold, color: colors.text },
   meta: { fontSize: 14, color: colors.muted, fontFamily: fonts.body },
+  draftHelp: { fontSize: 15, lineHeight: 21, color: colors.muted, fontFamily: fonts.body },
+  draftError: { fontSize: 14.5, color: colors.danger, fontFamily: fonts.bold },
   final: { fontSize: 22, fontFamily: fonts.displayBold, color: colors.text, fontVariant: ['tabular-nums'] },
 });

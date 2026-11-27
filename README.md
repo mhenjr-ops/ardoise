@@ -119,6 +119,10 @@ The app is for students and lecturers: sign in with email or matricule, sign up 
 
 **Bot check:** sign-in, sign-up, resend and the demo buttons pass a Cloudflare Turnstile token. The app gets it from `WEB_URL/app-check`, our own page, shown in a small web view (an iframe in the browser preview). It stays invisible unless Cloudflare wants a tick.
 
+**Draft transcript:** any student registered in a programme downloads `/api/transcripts/draft`: their year, semester by semester, computed from their marks so far with the deliberation engine (the jury's published result where there is one), stamped PROVISOIRE / DRAFT on every page and never verifiable. Website: Results page. App: Results tab (downloads with the app's session, then the share sheet).
+
+**Crash reports and updates:** a JavaScript error that would close the app shows an error screen instead and is sent to Alerts (`report_app_error`). `expo-updates` is on (`runtimeVersion` follows the app version): after a build, JavaScript-only fixes ship with `npx eas-cli@latest update --channel preview --environment preview --message "…"`; bump `version` in `app.json` whenever a native module changes.
+
 **Push notifications:** every in-app notification also goes to the person's phones, unless they muted that kind (Notifications → Phone alerts). The database sends them itself through Expo's push service (`pg_net`, migration `20261208000000_push.sql`) and forgets phones Expo no longer knows. They need a real build (not Expo Go) and, for Android:
 1. `npx eas-cli@latest init` in `mobile/` (writes the project ID into `app.json`).
 2. A Firebase project with an Android app `cm.ardoise.app`: put its `google-services.json` in `mobile/` (public identifiers, safe to commit; `app.config.js` picks it up).
@@ -134,7 +138,7 @@ The app is for students and lecturers: sign in with email or matricule, sign up 
 
 | Check | Result |
 | --- | --- |
-| `supabase/tests`: `npm install && npm test` (all migrations and the seeds on PGlite) | 469 checks pass: phone pushes (wording, mutes, batches of 100, forgotten phones, never blocking a post), the master account, its team chart and team messages, searched admin lists, programme enrolment from the upload, school isolation, role powers and oversight, structure set up by the Ardoise team, change requests, courses from the registrar's file, lecturers adding their courses, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
+| `supabase/tests`: `npm install && npm test` (all migrations and the seeds on PGlite) | 482 checks pass: draft transcripts (own marks only, published work only, official result where published), phone pushes (wording, mutes, batches of 100, forgotten phones, never blocking a post), the master account, its team chart and team messages, searched admin lists, programme enrolment from the upload, school isolation, role powers and oversight, structure set up by the Ardoise team, change requests, courses from the registrar's file, lecturers adding their courses, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
 | `web`: `npm test` (LMD engine, student-list and structure-list parsers, Excel template) | 31 tests pass |
 | `web`: `npx tsc --noEmit`, `npm run lint`, `npm run build` | clean |
 | `mobile`: `npx tsc --noEmit`, `npx expo lint`, `npx expo export` (Android and web) | clean |

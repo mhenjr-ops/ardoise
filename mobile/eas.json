@@ -9,7 +9,8 @@
       "android": {
         "buildType": "apk",
         "image": "latest"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "environment": "production",
@@ -17,7 +18,8 @@
       "android": {
         "buildType": "app-bundle",
         "image": "latest"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {

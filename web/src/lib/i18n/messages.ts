@@ -342,6 +342,8 @@ const fr = {
     issueTranscripts: "Émettre les relevés de notes",
     transcripts: "relevé(s) émis",
     transcript: "Relevé de notes (PDF)",
+    draftTranscript: "Relevé provisoire (PDF)",
+    draftTranscriptHelp: "Vos notes à ce jour, marquées PROVISOIRE. Le relevé officiel arrive après la délibération du jury.",
     average: "Moyenne",
     decision: "Décision",
     decisions: {
@@ -743,6 +745,8 @@ const en: CoreMessages = {
     issueTranscripts: "Issue transcripts",
     transcripts: "transcript(s) issued",
     transcript: "Transcript (PDF)",
+    draftTranscript: "Draft transcript (PDF)",
+    draftTranscriptHelp: "Your marks so far, stamped DRAFT. The official transcript comes after the jury's deliberation.",
     average: "Average",
     decision: "Decision",
     decisions: {

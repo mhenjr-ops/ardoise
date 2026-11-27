@@ -121,6 +121,10 @@ const fr = {
   minutes: 'min',
   myResults: 'Mes résultats',
   noResults: 'Aucun résultat publié pour le moment.',
+  draftTranscript: 'Relevé provisoire (PDF)',
+  draftTranscriptHelp: 'Vos notes à ce jour, marquées PROVISOIRE. Le relevé officiel arrive après la délibération du jury.',
+  draftNotRegistered: 'Votre inscription en filière n’est pas encore enregistrée. Voyez la scolarité.',
+  draftOffline: 'Pas de connexion. Réessayez quand vous êtes en ligne.',
   credits: 'Crédits',
   decision: 'Décision',
   decisions: { admitted: 'Admis', admitted_compensation: 'Admis par compensation', resit: 'Ajourné (rattrapage)', incomplete: 'Incomplet' },
@@ -361,6 +365,10 @@ const en: Dict = {
   minutes: 'min',
   myResults: 'My results',
   noResults: 'No published results yet.',
+  draftTranscript: 'Draft transcript (PDF)',
+  draftTranscriptHelp: 'Your marks so far, stamped DRAFT. The official transcript comes after the jury’s deliberation.',
+  draftNotRegistered: 'Your programme registration isn’t recorded yet. Ask the registrar’s office.',
+  draftOffline: 'No connection. Try again when you’re online.',
   credits: 'Credits',
   decision: 'Decision',
   decisions: { admitted: 'Passed', admitted_compensation: 'Passed by compensation', resit: 'Deferred (resit)', incomplete: 'Incomplete' },
@@ -555,12 +563,19 @@ export function formatDay(locale: Locale, dayKey: string, opts: Intl.DateTimeFor
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * "il y a 5 min", "in 3 h", "hier"... Written by hand: the phone's JavaScript engine (Hermes)
+ * has no Intl.RelativeTimeFormat, and calling it crashes the app.
+ */
 export function timeAgo(locale: Locale, iso: string, now: number): string {
   const diff = Math.round((new Date(iso).getTime() - now) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(locale === 'fr' ? 'fr' : 'en', { numeric: 'auto', style: 'short' });
+  const fr = locale === 'fr';
   const abs = Math.abs(diff);
-  if (abs < 60) return rtf.format(diff, 'second');
-  if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
-  if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
-  return rtf.format(Math.round(diff / 86400), 'day');
+  const say = (n: number, unit: string) => (diff < 0 ? (fr ? `il y a ${n} ${unit}` : `${n} ${unit} ago`) : fr ? `dans ${n} ${unit}` : `in ${n} ${unit}`);
+  if (abs < 60) return fr ? 'à l’instant' : 'just now';
+  if (abs < 3600) return say(Math.round(abs / 60), 'min');
+  if (abs < 86400) return say(Math.round(abs / 3600), 'h');
+  const days = Math.round(abs / 86400);
+  if (days === 1) return diff < 0 ? (fr ? 'hier' : 'yesterday') : fr ? 'demain' : 'tomorrow';
+  return say(days, fr ? 'j' : days === 1 ? 'day' : 'days');
 }
