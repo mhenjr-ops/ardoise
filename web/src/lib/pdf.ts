@@ -407,12 +407,11 @@ export async function buildTranscriptPdf(input: {
 
 
 const DRAFT_RED = rgb(0.69, 0.16, 0.1);
-const DRAFT_TINT = rgb(0.99, 0.95, 0.92);
 
 /**
  * Draft transcript: the student's marks so far, per semester of their year. Stamped
- * PROVISOIRE / DRAFT across every page, with no verification code: it proves nothing and
- * says so. Semesters the jury has published show the official result.
+ * PROVISOIRE / DRAFT across every page, with no verification code. Semesters the jury has
+ * published show the official result.
  */
 export async function buildDraftTranscriptPdf(input: {
   t: Messages;
@@ -428,27 +427,6 @@ export async function buildDraftTranscriptPdf(input: {
   doc.setProducer("Ardoise");
   const f = await fonts(doc);
   const w = new Writer(doc, f, A4_PORTRAIT);
-
-  // Banner first, so nobody mistakes it for the real thing even on a cropped photo.
-  const bannerLines = wrap(
-    f.safe(
-      fr
-        ? "Document non officiel. Les notes peuvent encore changer jusqu'à la délibération du jury. Ce relevé ne peut pas être vérifié et ne remplace pas le relevé officiel délivré par l'établissement."
-        : "Not an official document. Marks may still change until the jury's deliberation. This transcript cannot be verified and does not replace the official transcript issued by the university.",
-    ),
-    f.regular,
-    8.5,
-    w.width - 24,
-  );
-  const bannerH = 26 + bannerLines.length * 11.5;
-  w.page.drawRectangle({ x: MARGIN, y: w.y - bannerH, width: w.width, height: bannerH, color: DRAFT_TINT, borderColor: DRAFT_RED, borderWidth: 1 });
-  w.page.drawText(f.safe(fr ? "RELEVÉ PROVISOIRE · NON OFFICIEL" : "DRAFT TRANSCRIPT · NOT OFFICIAL"), {
-    x: MARGIN + 12, y: w.y - 17, size: 10, font: f.bold, color: DRAFT_RED,
-  });
-  bannerLines.forEach((line, i) => {
-    w.page.drawText(line, { x: MARGIN + 12, y: w.y - 31 - i * 11.5, size: 8.5, font: f.regular, color: INK });
-  });
-  w.y -= bannerH + 16;
 
   w.text(p.institution.toUpperCase(), { size: 11, bold: true, color: MUTED });
   w.text(fr ? "RELEVÉ DE NOTES PROVISOIRE" : "DRAFT TRANSCRIPT", { size: 18, bold: true, gap: 10 });
