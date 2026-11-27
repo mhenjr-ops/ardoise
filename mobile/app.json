@@ -62,6 +62,11 @@
       "typedRoutes": false,
       "reactCompiler": true,
       "baseUrl": "/app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6014f204-86a6-4ce4-8bdf-c1d6098132fd"
+      }
     }
   }
 }
