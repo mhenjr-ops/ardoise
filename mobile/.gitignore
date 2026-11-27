@@ -43,3 +43,8 @@ example
 /android
 .env
 .env*.local
+
+# Firebase service-account keys are secret: they go to expo.dev, never into git.
+# (google-services.json is public identifiers and is meant to be committed.)
+*service-account*.json
+*firebase-adminsdk*.json

@@ -10,10 +10,19 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { I18nProvider } from '@/lib/i18n';
+import { I18nProvider, useI18n } from '@/lib/i18n';
+import { usePush } from '@/lib/push';
 import { colors, fonts } from '@/components/ui';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/** Registers the phone for pushes and opens the screen a tapped push points to (needs the stack mounted). */
+function PushBridge() {
+  const { session, gate } = useAuth();
+  const { t, locale } = useI18n();
+  usePush({ active: !!session && gate === 'ready', locale, channelName: t.pushChannel });
+  return null;
+}
 
 function RootStack() {
   const { loading } = useAuth();
@@ -36,6 +45,7 @@ function RootStack() {
   return (
     <>
       <StatusBar style="light" />
+      <PushBridge />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.board },
@@ -56,6 +66,7 @@ function RootStack() {
         <Stack.Screen name="inbox/[id]" options={{ title: '' }} />
         <Stack.Screen name="discussion/[id]" options={{ title: '' }} />
         <Stack.Screen name="notifications" options={{ title: '' }} />
+        <Stack.Screen name="notification-settings" options={{ title: '' }} />
         <Stack.Screen name="grade/[id]" options={{ title: '' }} />
       </Stack>
     </>

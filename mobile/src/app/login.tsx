@@ -1,12 +1,14 @@
 import { Link, Redirect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BotCheck } from '@/components/bot-check';
 import { LogoMark, NdopPattern } from '@/components/ndop';
 import { Text } from '@/components/text';
 import { Button, Input, Loading, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import type { BotCheckHandle } from '@/lib/bot-check';
 import { useI18n } from '@/lib/i18n';
 import { isConfigured, supabase } from '@/lib/supabase';
 
@@ -25,6 +27,7 @@ export default function LoginScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
   const [demoBusy, setDemoBusy] = useState<'student' | 'teacher' | null>(null);
+  const check = useRef<BotCheckHandle>(null);
 
   if (session && gate === 'ready') return <Redirect href="/" />;
 
@@ -32,12 +35,17 @@ export default function LoginScreen() {
     setError(null);
     setDemoBusy(role);
     try {
+      const captchaToken = await check.current?.take();
       const res = await fetch(`${WEB_URL}/api/demo-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ role, captchaToken }),
       });
-      const tokens = (await res.json()) as { access_token?: string; refresh_token?: string };
+      const tokens = (await res.json()) as { access_token?: string; refresh_token?: string; error?: string };
+      if (tokens.error === 'captcha') {
+        setError(t.captcha);
+        return;
+      }
       if (!res.ok || !tokens.access_token || !tokens.refresh_token) throw new Error('demo');
       const { error: e } = await supabase.auth.setSession({ access_token: tokens.access_token, refresh_token: tokens.refresh_token });
       if (e) throw e;
@@ -65,9 +73,11 @@ export default function LoginScreen() {
         }
         email = data as string;
       }
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const captchaToken = await check.current?.take();
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } });
       if (authError) {
-        if (authError.code === 'email_not_confirmed') {
+        if (authError.code === 'captcha_failed') setError(t.captcha);
+        else if (authError.code === 'email_not_confirmed') {
           setUnconfirmed(email);
           setError(t.unconfirmed);
         } else setError(t.invalidLogin);
@@ -80,14 +90,17 @@ export default function LoginScreen() {
   async function resend() {
     if (!unconfirmed) return;
     setBusy(true);
+    const captchaToken = await check.current?.take();
     const { error: e } = await supabase.auth.resend({
       type: 'signup',
       email: unconfirmed,
-      options: WEB_URL ? { emailRedirectTo: `${WEB_URL}/auth/callback` } : undefined,
+      options: { emailRedirectTo: WEB_URL ? `${WEB_URL}/auth/callback` : undefined, captchaToken },
     });
     setBusy(false);
     setError(null);
     if (e && (e.status === 429 || e.code === 'over_email_send_rate_limit')) setError(t.emailLimit);
+    else if (e && e.code === 'captcha_failed') setError(t.captcha);
+    else if (e) setError(t.error);
     else setNotice(t.resent);
   }
 
@@ -187,6 +200,7 @@ export default function LoginScreen() {
                     <Text style={s.link}>{t.forgot}</Text>
                   </Pressable>
                 ) : null}
+                <BotCheck ref={check} />
                 {error ? <Text style={s.error}>{error}</Text> : null}
                 {notice ? <Text style={s.notice}>{notice}</Text> : null}
                 {unconfirmed ? <Button title={t.resend} variant="secondary" onPress={resend} disabled={busy} /> : null}

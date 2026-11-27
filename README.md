@@ -117,6 +117,13 @@ npx expo start                 # scan with Expo Go
 
 The app is for students and lecturers: sign in with email or matricule, sign up with university and matricule, forgot password (opens the web page), the two-step code for accounts that have it on. Office and Ardoise team accounts are told to use the website.
 
+**Bot check:** sign-in, sign-up, resend and the demo buttons pass a Cloudflare Turnstile token. The app gets it from `WEB_URL/app-check`, our own page, shown in a small web view (an iframe in the browser preview). It stays invisible unless Cloudflare wants a tick.
+
+**Push notifications:** every in-app notification also goes to the person's phones, unless they muted that kind (Notifications → Phone alerts). The database sends them itself through Expo's push service (`pg_net`, migration `20261208000000_push.sql`) and forgets phones Expo no longer knows. They need a real build (not Expo Go) and, for Android:
+1. `npx eas-cli@latest init` in `mobile/` (writes the project ID into `app.json`).
+2. A Firebase project with an Android app `cm.ardoise.app`: put its `google-services.json` in `mobile/` (public identifiers, safe to commit; `app.config.js` picks it up).
+3. Firebase → Settings → Service accounts → generate a private key, and upload it on expo.dev → Project → Credentials → Android → FCM V1 service account key. Never commit that key.
+
 **Google Play** (settings in `eas.json`; versions are counted by Expo):
 1. Accounts: an Expo account, and a Google Play developer account ($25, once). In Play Console, **Create app** with package `cm.ardoise.app`.
 2. The app's public settings, once per environment: `npx eas-cli@latest env:create --environment production --visibility plaintext --name EXPO_PUBLIC_SUPABASE_URL --value …` (same for `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `EXPO_PUBLIC_WEB_URL`; `--environment preview` for test builds).
@@ -127,7 +134,7 @@ The app is for students and lecturers: sign in with email or matricule, sign up 
 
 | Check | Result |
 | --- | --- |
-| `supabase/tests`: `npm install && npm test` (all migrations and the seeds on PGlite) | 370 checks pass: the master account, its team chart and team messages, searched admin lists, programme enrolment from the upload, school isolation, role powers and oversight, structure set up by the Ardoise team, change requests, courses from the registrar's file, lecturers adding their courses, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
+| `supabase/tests`: `npm install && npm test` (all migrations and the seeds on PGlite) | 469 checks pass: phone pushes (wording, mutes, batches of 100, forgotten phones, never blocking a post), the master account, its team chart and team messages, searched admin lists, programme enrolment from the upload, school isolation, role powers and oversight, structure set up by the Ardoise team, change requests, courses from the registrar's file, lecturers adding their courses, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
 | `web`: `npm test` (LMD engine, student-list and structure-list parsers, Excel template) | 31 tests pass |
 | `web`: `npx tsc --noEmit`, `npm run lint`, `npm run build` | clean |
 | `mobile`: `npx tsc --noEmit`, `npx expo lint`, `npx expo export` (Android and web) | clean |
@@ -143,7 +150,7 @@ Not yet done: a run on a physical Android phone.
 - PDFs use the standard Latin-1 fonts: French accents work, other scripts are replaced.
 - Student-list import takes Excel/CSV from any registration system. A reader for the University of Bamenda's own Form B (its portal only) can come later.
 - Two-step login uses authenticator apps; SMS codes and backup codes come next. A lost phone is reset by the Ardoise team in the database.
-- Still to come: per-school branding, mobile-money billing, iOS build, offline course downloads.
+- Still to come: mobile-money billing, iOS build, offline course downloads.
 
 ## Decisions
 

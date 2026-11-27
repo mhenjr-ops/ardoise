@@ -68,12 +68,18 @@ export default function NotificationsScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: t.notifications }} />
-      {unread ? (
-        <Pressable onPress={markAll} hitSlop={8} style={({ pressed }) => [s.markAll, pressed && { opacity: 0.7 }]}>
-          <Icon name="check" size={16} color={colors.board} strokeWidth={2.2} />
-          <Text style={s.markAllText}>{t.markAllRead}</Text>
+      <View style={s.actions}>
+        <Pressable onPress={() => router.push('/notification-settings')} hitSlop={8} style={({ pressed }) => [s.markAll, pressed && { opacity: 0.7 }]}>
+          <Icon name="phone" size={16} color={colors.board} strokeWidth={2.2} />
+          <Text style={s.markAllText}>{t.phoneAlerts}</Text>
         </Pressable>
-      ) : null}
+        {unread ? (
+          <Pressable onPress={markAll} hitSlop={8} style={({ pressed }) => [s.markAll, pressed && { opacity: 0.7 }]}>
+            <Icon name="check" size={16} color={colors.board} strokeWidth={2.2} />
+            <Text style={s.markAllText}>{t.markAllRead}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {list.length === 0 ? (
         <Empty text={t.noNotifications} />
       ) : (
@@ -109,7 +115,8 @@ const s = StyleSheet.create({
   text: { fontSize: 15.5, fontFamily: fonts.body, color: colors.text, lineHeight: 21 },
   preview: { fontSize: 14.5, fontFamily: fonts.body, color: colors.muted, lineHeight: 20 },
   when: { fontSize: 13, fontFamily: fonts.body, color: colors.muted },
-  markAll: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.brandSoft },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
+  markAll: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: colors.brandSoft },
   markAllText: { fontFamily: fonts.bold, fontSize: 14.5, color: colors.board },
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.ochre, marginTop: 6 },
 });

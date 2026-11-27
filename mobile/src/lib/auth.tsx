@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { unregisterPush } from './push';
 import { supabase } from './supabase';
 
 /**
@@ -77,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       gate,
       refreshGate,
       signOut: async () => {
+        await unregisterPush();
         await supabase.auth.signOut();
       },
     }),

@@ -1,11 +1,13 @@
 import { Link, Redirect, router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { BotCheck } from '@/components/bot-check';
 import { LogoMark, NdopPattern } from '@/components/ndop';
 import { Text } from '@/components/text';
 import { Button, Input, colors, fonts } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
+import type { BotCheckHandle } from '@/lib/bot-check';
 import { useI18n } from '@/lib/i18n';
 import { isConfigured, supabase } from '@/lib/supabase';
 
@@ -30,6 +32,7 @@ export default function SignUpScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const check = useRef<BotCheckHandle>(null);
 
   useEffect(() => {
     supabase.rpc('school_directory').then(({ data }) => setSchools((data ?? []) as School[]));
@@ -49,17 +52,19 @@ export default function SignUpScreen() {
       return;
     }
     setBusy(true);
+    const captchaToken = await check.current?.take();
     const { data, error: e } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
+        captchaToken,
         data: { full_name: fullName.trim(), locale, school_code: school.slug, matricule: matricule.trim().toUpperCase() },
         emailRedirectTo: WEB_URL ? `${WEB_URL}/auth/callback` : undefined,
       },
     });
     setBusy(false);
     if (e) {
-      setError(e.status === 429 || e.code === 'over_email_send_rate_limit' ? t.emailLimit : t.error);
+      setError(e.status === 429 || e.code === 'over_email_send_rate_limit' ? t.emailLimit : e.code === 'captcha_failed' ? t.captcha : t.error);
       return;
     }
     // An email that already has an account comes back without an identity, and no email is sent.
@@ -129,6 +134,7 @@ export default function SignUpScreen() {
                   textContentType="newPassword"
                 />
                 <Text style={s.hint}>{t.passwordHint}</Text>
+                <BotCheck ref={check} />
                 {error ? <Text style={s.error}>{error}</Text> : null}
                 <Button title={t.createAccount} onPress={onSubmit} loading={busy} disabled={!isConfigured} />
                 <View style={s.row}>
