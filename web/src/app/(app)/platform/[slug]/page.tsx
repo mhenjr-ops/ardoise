@@ -26,6 +26,7 @@ import {
   removeItem,
   setSchoolStatus,
   setStructureConfirmed,
+  setTranscriptTemplate,
   updateDepartment,
   updateProgramme,
   updateUnit,
@@ -44,7 +45,7 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
   if (!isPlatformAdmin) notFound();
   const { slug } = await params;
   const sp = await searchParams;
-  const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale, status, structure_source, structure_confirmed_at, short_name, brand_color, logo_path, city, website")
+  const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale, status, structure_source, structure_confirmed_at, short_name, brand_color, logo_path, city, website, transcript_template")
     .eq("slug", slug).maybeSingle();
   if (!school) notFound();
 
@@ -327,6 +328,28 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
                   <input type="hidden" name="confirmed" value={school.structure_confirmed_at ? "0" : "1"} />
                   <Button type="submit" size="sm" variant="secondary">
                     {school.structure_confirmed_at ? t.prospects.unconfirm : t.prospects.confirm}
+                  </Button>
+                </form>
+              </div>
+              <div className="border-t border-slate-100 pt-4">
+                <p className="mb-1 text-[14.5px] font-semibold text-slate-900">{t.prospects.transcriptLayout}</p>
+                <p className="text-[14px] text-slate-600">{t.prospects.transcriptLayoutHelp}</p>
+                <form action={setTranscriptTemplate} className="mt-3 flex flex-wrap items-center gap-2">
+                  {common}
+                  <select
+                    name="template"
+                    defaultValue={school.transcript_template ?? "standard"}
+                    aria-label={t.prospects.transcriptLayout}
+                    className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-[14px]"
+                  >
+                    {(["standard", "uba"] as const).map((k) => (
+                      <option key={k} value={k}>
+                        {t.prospects.layouts[k]}
+                      </option>
+                    ))}
+                  </select>
+                  <Button type="submit" size="sm" variant="secondary">
+                    {t.prospects.saveLayout}
                   </Button>
                 </form>
               </div>

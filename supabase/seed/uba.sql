@@ -88,8 +88,8 @@ declare
 begin
   select id into inst from public.institutions where slug = 'uba';
   if inst is null then
-    insert into public.institutions (name, slug, short_name, default_locale, structure_source)
-    values ('University of Bamenda', 'uba', 'UBa', 'en', 'https://uniba.cm https://nahpi.cm')
+    insert into public.institutions (name, slug, short_name, default_locale, structure_source, transcript_template)
+    values ('University of Bamenda', 'uba', 'UBa', 'en', 'https://uniba.cm https://nahpi.cm', 'uba')
     returning id into inst;
   end if;
 

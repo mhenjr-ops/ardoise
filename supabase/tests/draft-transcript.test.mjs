@@ -5,7 +5,9 @@ const { db, ids, as, check, expectError, done, createSchool } = await setup(['A'
 const inst = await createSchool('A', 'Ecole A', 'ecole-a');
 const q = async (sql, params = []) => (await db.query(sql, params)).rows;
 
-const [prog] = await q(`insert into public.programmes (institution_id, name, code) values ($1, 'Licence Informatique', 'LINF') returning id`, [inst]);
+const [fac] = await q(`insert into public.faculties (institution_id, name) values ($1, 'National Higher Polytechnic Institute') returning id`, [inst]);
+const [dep] = await q(`insert into public.departments (institution_id, faculty_id, name) values ($1, $2, 'Civil Engineering and Architecture') returning id`, [inst, fac.id]);
+const [prog] = await q(`insert into public.programmes (institution_id, department_id, name, code) values ($1, $2, 'Licence Informatique', 'LINF') returning id`, [inst, dep.id]);
 const [oldYear] = await q(`insert into public.academic_years (institution_id, label, is_current, starts_on) values ($1, '2025-2026', false, '2025-10-01') returning id`, [inst]);
 const [year] = await q(`insert into public.academic_years (institution_id, label, is_current, starts_on) values ($1, '2026-2027', true, '2026-10-01') returning id`, [inst]);
 const [s1] = await q(`insert into public.semesters (institution_id, academic_year_id, label, starts_on) values ($1, $2, 'S1', '2026-10-01') returning id`, [inst, year.id]);
@@ -46,4 +48,22 @@ check('another student sees their own mark only', r2.semesters[0].grades.length 
 check('and not someone else\'s published result', r2.semesters[1].published === null);
 const rx = (await as('X', `select public.draft_transcript_data() as d`)).rows[0].d;
 check('someone not registered in a programme gets nothing', rx === null);
+check('the letterhead gets the department and faculty',
+  r.programme.department === 'Civil Engineering and Architecture' && r.programme.faculty === 'National Higher Polytechnic Institute');
+check('a university uses the standard layout unless told otherwise', r.institution.template === 'standard');
+
+// Only the Ardoise team picks a university's transcript layout.
+try {
+  await as('A', `update public.institutions set transcript_template = 'uba' where id = $1`, [inst]);
+} catch {
+  // refused outright: also fine
+}
+let tpl = (await q(`select transcript_template from public.institutions where id = $1`, [inst]))[0].transcript_template;
+check('the university\'s own owner cannot change its transcript layout', tpl === 'standard');
+await expectError('nor through the function', () => as('A', `select public.set_transcript_template($1, 'uba')`, [inst]), 'forbidden');
+await q(`insert into public.platform_admins (user_id) values ($1)`, [ids.X]);
+await expectError('an unknown layout is refused', () => as('X', `select public.set_transcript_template($1, 'fancy')`, [inst]), 'invalid');
+await as('X', `select public.set_transcript_template($1, 'uba')`, [inst]);
+const r3 = (await as('S1', `select public.draft_transcript_data() as d`)).rows[0].d;
+check('the Ardoise team sets it, and the draft follows', r3.institution.template === 'uba');
 done();

@@ -100,6 +100,17 @@ export async function setStructureConfirmed(formData: FormData) {
   done(back, "status");
 }
 
+export async function setTranscriptTemplate(formData: FormData) {
+  const back = page(formData);
+  const { supabase } = await actionSession();
+  const { error } = await supabase.rpc("set_transcript_template", {
+    p_institution: str(formData, "institution_id", 40),
+    p_template: str(formData, "template", 20),
+  });
+  if (error) redirect(`${back}?error=${errorCode(error)}#status`);
+  done(back, "status");
+}
+
 export async function importOutline(formData: FormData) {
   const back = page(formData);
   const units = parseOutline(String(formData.get("outline") ?? "").slice(0, 100_000));

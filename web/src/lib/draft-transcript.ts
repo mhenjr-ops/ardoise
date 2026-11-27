@@ -22,22 +22,27 @@ export type DraftSemester = {
   decision: Decision;
 };
 
+export type TranscriptTemplate = "standard" | "uba";
+
 export type DraftTranscript = {
+  template: TranscriptTemplate;
   institution: string;
   student_name: string;
   student_email: string;
   matricule: string | null;
   programme: string;
   programme_code: string | null;
+  department: string | null;
+  faculty: string | null;
   level: string;
   academic_year: string;
   semesters: DraftSemester[];
 };
 
 type Raw = {
-  institution: { name: string; short_name: string | null } | null;
+  institution: { name: string; short_name: string | null; template?: string | null } | null;
   student: { full_name: string | null; email: string | null; matricule: string | null } | null;
-  programme: { name: string; code: string | null } | null;
+  programme: { name: string; code: string | null; department?: string | null; faculty?: string | null } | null;
   level: string;
   academic_year: string;
   policy: Record<string, unknown> | null;
@@ -110,12 +115,15 @@ export async function loadDraftTranscript(supabase: SupabaseClient, userId: stri
   });
 
   return {
+    template: raw.institution?.template === "uba" ? "uba" : "standard",
     institution: raw.institution?.name ?? "",
     student_name: raw.student?.full_name || raw.student?.email || "",
     student_email: raw.student?.email ?? "",
     matricule: raw.student?.matricule ?? null,
     programme: raw.programme?.name ?? "",
     programme_code: raw.programme?.code ?? null,
+    department: raw.programme?.department ?? null,
+    faculty: raw.programme?.faculty ?? null,
     level: raw.level,
     academic_year: raw.academic_year,
     semesters,

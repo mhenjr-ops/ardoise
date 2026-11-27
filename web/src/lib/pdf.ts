@@ -35,22 +35,22 @@ function makeSafe(font: PDFFont) {
       .join("");
 }
 
-type Fonts = { regular: PDFFont; bold: PDFFont; safe: (s: string) => string };
+export type Fonts = { regular: PDFFont; bold: PDFFont; safe: (s: string) => string };
 
-async function fonts(doc: PDFDocument): Promise<Fonts> {
+export async function fonts(doc: PDFDocument): Promise<Fonts> {
   const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   return { regular, bold, safe: makeSafe(regular) };
 }
 
-function fit(text: string, font: PDFFont, size: number, width: number) {
+export function fit(text: string, font: PDFFont, size: number, width: number) {
   if (font.widthOfTextAtSize(text, size) <= width) return text;
   let t = text;
   while (t.length > 1 && font.widthOfTextAtSize(`${t}…`, size) > width) t = t.slice(0, -1);
   return `${t}…`;
 }
 
-function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
+export function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
   const words = text.split(/\s+/);
   const lines: string[] = [];
   let line = "";

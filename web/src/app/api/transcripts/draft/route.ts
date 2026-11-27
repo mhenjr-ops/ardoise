@@ -5,6 +5,7 @@ import { supabaseKey, supabaseUrl } from "@/lib/env";
 import { getI18n } from "@/lib/i18n/server";
 import { messages, type Locale } from "@/lib/i18n/messages";
 import { buildDraftTranscriptPdf } from "@/lib/pdf";
+import { buildUbaDraftTranscriptPdf } from "@/lib/transcripts/uba";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -36,7 +37,12 @@ export async function GET(request: NextRequest) {
   }
   if (!draft) return NextResponse.json({ error: "not_registered" }, { status: 404 });
 
-  const pdf = await buildDraftTranscriptPdf({ t, locale, draft, generatedAt: new Date().toISOString() });
+  // Each university's own layout where Ardoise has one (chosen by the Ardoise team).
+  const generatedAt = new Date().toISOString();
+  const pdf =
+    draft.template === "uba"
+      ? await buildUbaDraftTranscriptPdf({ draft, generatedAt })
+      : await buildDraftTranscriptPdf({ t, locale, draft, generatedAt });
   const safeName = draft.student_name.normalize("NFD").replace(/[^A-Za-z0-9]+/g, "-");
   return new NextResponse(Buffer.from(pdf), {
     headers: {

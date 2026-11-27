@@ -431,6 +431,10 @@ export const frRoles = {
     bannerBody: "Ardoise a préparé ces facultés, départements et filières à partir de sources publiques (votre site, les listes du MINESUP). Vérifiez-les et envoyez-nous ce qui manque ou ce qui est faux.",
     bannerClosed: "Les étudiants ne peuvent pas encore rejoindre votre université : elle ouvre une fois la structure vérifiée.",
     bannerAction: "Envoyer une correction",
+    transcriptLayout: "Modèle de relevé de notes",
+    transcriptLayoutHelp: "La mise en page des relevés de ses étudiants. Un modèle propre à l'université reprend son en-tête officiel ; le relevé provisoire reste marqué « DRAFT » sur chaque page.",
+    layouts: { standard: "Standard Ardoise (LMD, /20)", uba: "Université de Bamenda (notes /100, GPA sur 4)" },
+    saveLayout: "Enregistrer le modèle",
   },
   look: {
     title: "Logo et couleurs",
@@ -987,6 +991,10 @@ export const enRoles: RolesMessages = {
     bannerBody: "Ardoise prepared these faculties, departments and programmes from public sources (your website, MINESUP's lists). Please check them and send us anything missing or wrong.",
     bannerClosed: "Students can't join your university yet: it opens once the structure is checked.",
     bannerAction: "Send a correction",
+    transcriptLayout: "Transcript layout",
+    transcriptLayoutHelp: "How its students' transcripts are laid out. A university's own layout follows its official letterhead; the draft transcript stays stamped DRAFT on every page.",
+    layouts: { standard: "Ardoise standard (LMD, /20)", uba: "University of Bamenda (marks /100, GPA on 4)" },
+    saveLayout: "Save layout",
   },
   look: {
     title: "Logo and colours",
