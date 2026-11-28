@@ -98,10 +98,13 @@ const mat = (await as('T', `select public.teach_catalogue_course($1) as id`, [aw
 m = await members(mat);
 check('a shared course takes first-years of both departments', has(m, 'S1') && has(m, 'S3') && !has(m, 'S2'));
 const fluid = (await as('T', `select public.teach_catalogue_course($1) as id`, [await catId('CVLE2201')])).rows[0].id;
-check('a second-semester course opened early takes no students yet', (await members(fluid)).filter((e) => e.role === 'student').length === 0);
+const fluidSem = (await q(`select s.label from public.courses c join public.semesters s on s.id = c.semester_id where c.id = $1`, [fluid]))[0].label;
+check('a second-semester course claimed now opens for the second semester', fluidSem === 'Second Semester');
+check('and takes its first-year students', has(await members(fluid), 'S1') && !has(await members(fluid), 'S2'));
+check('the search shows it as opened and taught', (await as('T', `select teaching from public.catalogue_search($1, 'CVLE2201')`, [inst])).rows[0]?.teaching === true);
 
 await place('S4', p1.id, 'L1');
-check('a student placed later joins the courses already open', has(await members(cvle), 'S4') && has(await members(mat), 'S4'));
+check('a student placed later joins the courses already open, both semesters', has(await members(cvle), 'S4') && has(await members(mat), 'S4') && has(await members(fluid), 'S4'));
 
 // --- Search ---
 const res = (await as('T', `select * from public.catalogue_search($1, '', $2, 1, 1)`, [inst, d1.id])).rows;

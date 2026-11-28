@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  ClipboardList,
   CalendarDays,
   GraduationCap,
   Inbox,
@@ -112,6 +113,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       { href: "/inbox", label: t.shell.inbox, icon: <Inbox size={19} aria-hidden />, badge: inboxBadge },
     );
     if (roles.includes("student")) {
+      items.push({ href: "/registration", label: t.formB.nav, icon: <ClipboardList size={19} aria-hidden /> });
       items.push({ href: "/results", label: t.nav.results, icon: <GraduationCap size={19} aria-hidden /> });
     }
     if (can.adminArea) {

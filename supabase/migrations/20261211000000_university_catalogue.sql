@@ -128,6 +128,19 @@ returns smallint language sql stable security definer set search_path = public a
   ) x where x.id = p_sem
 $$;
 
+-- The semester a catalogue course runs in this year: the current academic year's semester
+-- with its number (1 or 2), else the current semester.
+create or replace function public.catalogue_semester(inst uuid, p_no int)
+returns uuid language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select s.id from semesters s
+     where p_no is not null
+       and s.academic_year_id = (select academic_year_id from semesters where id = public.current_semester(inst))
+       and public.semester_no(s.id) = p_no
+     limit 1),
+    public.current_semester(inst))
+$$;
+
 create or replace function public.can_edit_catalogue(inst uuid)
 returns boolean language sql stable security definer set search_path = public as $$
   select public.is_platform_admin() or public.has_inst_role(inst, array['admin', 'registrar', 'dean', 'hod'])
@@ -224,18 +237,14 @@ begin
 end;
 $$;
 
--- A student placed in a programme (or moved to another year) joins the semester's courses
+-- A student placed in a programme (or moved to another year) joins that year's courses
 -- that are already open for their department and year.
 create or replace function public.auto_enrol_student(p_student uuid, p_institution uuid)
 returns int language plpgsql security definer set search_path = public as $$
 declare
-  sem uuid := public.current_semester(p_institution);
   total int := 0;
   r record;
 begin
-  if sem is null then
-    return 0;
-  end if;
   for r in
     select distinct co.id
     from courses co
@@ -244,7 +253,7 @@ begin
     join programmes p on p.department_id = cd.department_id
     join programme_enrollments pe on pe.programme_id = p.id and pe.student_id = p_student
     join semesters s on s.id = co.semester_id and s.academic_year_id = pe.academic_year_id
-    where co.institution_id = p_institution and co.semester_id = sem
+    where co.institution_id = p_institution
       and public.level_year(pe.level) = cc.level
   loop
     total := total + public.auto_enrol_course(r.id);
@@ -302,7 +311,6 @@ create or replace function public.catalogue_search(
   departments text, department_ids uuid[], retired boolean, course_id uuid, teachers text, teaching boolean, students int, total bigint
 ) language plpgsql stable security definer set search_path = public as $$
 declare
-  cur uuid := public.current_semester(p_institution);
   q text := coalesce(trim(p_query), '');
 begin
   if not (public.is_school_staff(p_institution) or public.is_platform_admin()) then
@@ -320,7 +328,8 @@ begin
       and (p_level is null or cc.level = p_level)
       and (p_semester is null or cc.semester_no = p_semester)
       and (not p_mine or exists (select 1 from courses co join enrollments e on e.course_id = co.id
-                                 where co.catalogue_id = cc.id and co.semester_id = cur
+                                 where co.catalogue_id = cc.id
+                                   and co.semester_id = public.catalogue_semester(p_institution, cc.semester_no)
                                    and e.user_id = auth.uid() and e.role in ('teacher', 'ta')))
   ), page as (
     select f.*, count(*) over () as total from f
@@ -339,7 +348,8 @@ begin
     (select count(*)::int from enrollments e where e.course_id = o.id and e.role = 'student'),
     pg.total
   from page pg
-  left join lateral (select co.id from courses co where co.catalogue_id = pg.id and co.semester_id = cur
+  left join lateral (select co.id from courses co
+                     where co.catalogue_id = pg.id and co.semester_id = public.catalogue_semester(p_institution, pg.semester_no)
                      order by co.created_at limit 1) o on true
   order by (q <> '' and upper(pg.code) = upper(q)) desc, pg.code;
 end;
@@ -376,7 +386,8 @@ begin
 end;
 $$;
 
--- The course for this semester, opened from the catalogue if nobody has yet.
+-- The course for this year, in its own semester (a second-semester course opened now is
+-- opened for the second semester), opened from the catalogue if nobody has yet.
 create or replace function public.open_catalogue_course(p_catalogue uuid)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare
@@ -393,7 +404,7 @@ begin
   if cc.retired_at is not null then
     raise exception 'invalid';
   end if;
-  sem := public.current_semester(cc.institution_id);
+  sem := public.catalogue_semester(cc.institution_id, cc.semester_no);
   select id into cid from courses
   where institution_id = cc.institution_id and semester_id = sem
     and (catalogue_id = cc.id or upper(code) = upper(cc.code))
@@ -587,6 +598,7 @@ revoke execute on function public.tg_catalogue_course(), public.tg_catalogue_dep
   public.tg_course_auto_enrol(), public.tg_programme_auto_enrol(), public.auto_enrol_course(uuid),
   public.auto_enrol_student(uuid, uuid), public.open_catalogue_course(uuid)
   from public, anon, authenticated;
+revoke execute on function public.catalogue_semester(uuid, int) from public, anon, authenticated;
 revoke execute on function public.level_year(text), public.semester_no(uuid), public.can_edit_catalogue(uuid),
   public.can_add_catalogue(uuid), public.drop_course(uuid), public.catalogue_search(uuid, text, uuid, int, int, boolean, int, int),
   public.teach_catalogue_course(uuid), public.catalogue_save(uuid, uuid, text, text, int, int, numeric, uuid[]),

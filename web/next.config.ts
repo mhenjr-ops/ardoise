@@ -4,6 +4,8 @@ import type { NextConfig } from "next";
 // login and reads the session, so a static shell buys little. Turning it
 // on later means wrapping session reads in <Suspense> (see README).
 const nextConfig: NextConfig = {
+  // The Form B reader (pdf.js) runs as a plain Node package, not bundled.
+  serverExternalPackages: ["unpdf"],
   turbopack: {
     rules: {
       "*.css": {

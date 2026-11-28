@@ -8,7 +8,7 @@ A learning platform for Cameroonian universities, in the spirit of Canvas and Bl
 ardoise-lms/
 ├── supabase/
 │   ├── migrations/   # run in filename order
-│   ├── seed/         # demo.sql, demo-engage.sql, demo-roles.sql; uba.sql + uba-demo.sql (University of Bamenda); prospects.sql (14 universities in preparation)
+│   ├── seed/         # demo.sql, demo-engage.sql, demo-roles.sql; uba.sql + uba-demo.sql + uba-civil-demo.sql (University of Bamenda); prospects.sql (14 universities in preparation)
 │   └── tests/        # 331 security and behaviour checks on a real Postgres engine (PGlite)
 ├── web/              # Next.js 16 web app (all roles); serves the phone preview at /app
 └── mobile/           # Expo SDK 58 phone app (students and teachers)
@@ -73,7 +73,7 @@ The defaults (pass 10/20, compensation on, CC 30 / TP 20 / exam 50, jury bonus u
 
 1. Create a project at supabase.com.
 2. **SQL Editor**: run every file in `supabase/migrations/` in filename order (or `supabase link` then `supabase db push`).
-3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`, then `supabase/seed/demo-roles.sql`. For presentations, `supabase/seed/uba.sql` loads the University of Bamenda's faculties, schools, departments and programmes, and `supabase/seed/uba-demo.sql` adds the university's administrator, a lecturer teaching in three departments and a student with a full load (with classmates, timetable and first week of work). It needs the password for those three accounts first, so it is never in the repository: `select set_config('ardoise.demo_password', '…', false);` then run the file. `supabase/seed/prospects.sql` prepares 14 more universities as private prospects (structure only, taken from public sources and marked to check): the Ardoise team opens each one from its console page once it signs.
+3. Optional demo data: run `supabase/seed/demo.sql`, then `supabase/seed/demo-engage.sql`, then `supabase/seed/demo-roles.sql`. For presentations, `supabase/seed/uba.sql` loads the University of Bamenda's faculties, schools, departments and programmes, and `supabase/seed/uba-demo.sql` adds the university's administrator, a lecturer teaching in three departments and a student with a full load (with classmates, timetable and first week of work). It needs the password for those three accounts first, so it is never in the repository: `select set_config('ardoise.demo_password', '…', false);` then run the file. `supabase/seed/uba-civil-demo.sql` (after the catalogue and Form B migrations) adds a NAHPI Civil Engineering Level 200 class: the real first-semester load (12 courses, 35 credits), ten lecturers, a timetable and CA and exam marks; its sign-in accounts (g.tabe, r.fon and e.tita @demo.ardoise.cm) take admin.uba's password. `supabase/seed/prospects.sql` prepares 14 more universities as private prospects (structure only, taken from public sources and marked to check): the Ardoise team opens each one from its console page once it signs.
 4. Give the Ardoise team access to the console: sign up once on the web app, then in the SQL Editor run `insert into public.platform_admins (user_id) select id from auth.users where email = 'you@example.com';`
 5. **Authentication → URL Configuration**: Site URL = your web address (e.g. `https://ardoise-pi.vercel.app`); add `<site>/**` to Redirect URLs. Without this, sign-up and password emails point to localhost.
 6. **Emails**: the built-in sender is for testing only (a handful of emails an hour, often spam). Before real students sign up, follow `supabase/templates/README.md`: your own sender (SMTP), a higher hourly limit, and Ardoise's bilingual templates, whose links work on any device.
@@ -138,8 +138,8 @@ The app is for students and lecturers: sign in with email or matricule, sign up 
 
 | Check | Result |
 | --- | --- |
-| `supabase/tests`: `npm install && npm test` (all migrations and the seeds on PGlite) | 488 checks pass: transcript layouts (Ardoise team only), draft transcripts (own marks only, published work only, official result where published), phone pushes (wording, mutes, batches of 100, forgotten phones, never blocking a post), the master account, its team chart and team messages, searched admin lists, programme enrolment from the upload, school isolation, role powers and oversight, structure set up by the Ardoise team, change requests, courses from the registrar's file, lecturers adding their courses, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
-| `web`: `npm test` (LMD engine, student-list and structure-list parsers, Excel template) | 31 tests pass |
+| `supabase/tests`: `npm install && npm test` (all migrations and the seeds on PGlite) | 568 checks pass: course catalogue (import, adding by hand, lecturers claiming, students joining by department and year, dropping), Form B (own matricule, this year, one file one account, registrations), course-by-course draft transcripts, the UBa Civil Engineering class, transcript layouts (Ardoise team only), draft transcripts (own marks only, published work only, official result where published), phone pushes (wording, mutes, batches of 100, forgotten phones, never blocking a post), the master account, its team chart and team messages, searched admin lists, programme enrolment from the upload, school isolation, role powers and oversight, structure set up by the Ardoise team, change requests, courses from the registrar's file, lecturers adding their courses, invitations, matricule claims and sign-in, student-list import, answer keys hidden, quiz marking, locked deliberations, transcript verification, inbox and discussion permissions, attendance codes and rate limits, no backdated posts, function lock-down |
+| `web`: `npm test` (LMD engine, student-list, structure-list and course-catalogue parsers, Excel template) | 38 tests pass |
 | `web`: `npx tsc --noEmit`, `npm run lint`, `npm run build` | clean |
 | `mobile`: `npx tsc --noEmit`, `npx expo lint`, `npx expo export` (Android and web) | clean |
 | Live demo (Supabase + Vercel) | web checked as owner, registrar, head of department, teacher, student (email and matricule sign-in), Ardoise console and invitation links; phone preview checked as student and teacher |
@@ -152,7 +152,8 @@ Not yet done: a run on a physical Android phone.
 - Notifications are in-app only; push, SMS and WhatsApp come next.
 - Multiple-choice questions are all-or-nothing; editing an answer key doesn't re-mark past attempts.
 - PDFs use the standard Latin-1 fonts: French accents work, other scripts are replaced.
-- Student-list import takes Excel/CSV from any registration system. A reader for the University of Bamenda's own Form B (its portal only) can come later.
+- Student-list import takes Excel/CSV from any registration system. Students can also upload their Form B (University of Bamenda) as a PDF printed from the portal: it is read for text only (no photos or scans yet), and its layout was built from a specimen, so check it against real Form Bs.
+- Students join a course automatically by department and year only when the catalogue links the course to their department; shared and general courses (maths, physics, languages) come from the Form B or the registrar's file.
 - Two-step login uses authenticator apps; SMS codes and backup codes come next. A lost phone is reset by the Ardoise team in the database.
 - Still to come: mobile-money billing, iOS build, offline course downloads.
 
