@@ -15,6 +15,7 @@ const KNOWN = [
   "platform_account",
   "school_account",
   "rate_limited",
+  "duplicate_code",
 ];
 
 /** Turns a Supabase/Postgres error into one of the translated error codes. */

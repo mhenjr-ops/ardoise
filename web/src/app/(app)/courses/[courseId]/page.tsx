@@ -8,7 +8,7 @@ import { expandEvents, formatDayLabel, formatTime, watDayKey } from "@/lib/calen
 import { timeAgo } from "@/lib/notifications";
 import { Button, Card, CardHeader, Disclosure, ProgressRing, Textarea, buttonClass } from "@/components/ui";
 import type { Announcement, Assignment, CalendarEvent } from "@/lib/types";
-import { updateDescription } from "./actions";
+import { dropCourse, updateDescription } from "./actions";
 
 export default async function CourseHomePage({ params }: PageProps<"/courses/[courseId]">) {
   const { courseId } = await params;
@@ -48,13 +48,16 @@ export default async function CourseHomePage({ params }: PageProps<"/courses/[co
   let progress: number | null = null;
   let average: number | null = null;
   let attendance: number | null = null;
+  let addedAuto = false;
   if (isStudent) {
-    const [{ data: all }, { data: subs }, { data: grades }, { data: att }] = await Promise.all([
+    const [{ data: all }, { data: subs }, { data: grades }, { data: att }, { data: mine }] = await Promise.all([
       supabase.from("assignments").select("id, points_possible, weight").eq("course_id", course.id).eq("published", true),
       supabase.from("submissions").select("assignment_id").eq("course_id", course.id).eq("student_id", user.id),
       supabase.from("grades").select("assignment_id, student_id, score").eq("course_id", course.id).eq("student_id", user.id),
       supabase.from("attendance_records").select("status").eq("course_id", course.id).eq("student_id", user.id),
+      supabase.from("enrollments").select("added_by").eq("course_id", course.id).eq("user_id", user.id).eq("role", "student").maybeSingle(),
     ]);
+    addedAuto = mine?.added_by === "auto";
     const done = new Set([...(subs ?? []), ...(grades ?? []).filter((g) => g.score !== null)].map((r) => r.assignment_id));
     progress = (all ?? []).length ? (all ?? []).filter((a) => done.has(a.id)).length / (all ?? []).length : null;
     average = weightedAverage((all ?? []) as Array<{ id: string; points_possible: number; weight: number }>, grades ?? [], user.id);
@@ -212,6 +215,23 @@ export default async function CourseHomePage({ params }: PageProps<"/courses/[co
             </ul>
           )}
         </Card>
+
+        {addedAuto ? (
+          <Card className="p-4">
+            <p className="text-[14.5px] font-semibold text-slate-900">{t.catalogue.dropTitle}</p>
+            <p className="mt-1 text-[13.5px] leading-relaxed text-slate-600">{t.catalogue.dropHelp}</p>
+            <details className="mt-3">
+              <summary className="cursor-pointer text-[13.5px] font-semibold text-terracotta-600 hover:underline">{t.catalogue.drop}</summary>
+              <form action={dropCourse} className="mt-2 space-y-2">
+                <input type="hidden" name="course_id" value={course.id} />
+                <p className="text-[13.5px] text-slate-600">{t.catalogue.dropConfirm}</p>
+                <Button type="submit" size="sm" variant="danger">
+                  {t.catalogue.drop}
+                </Button>
+              </form>
+            </details>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

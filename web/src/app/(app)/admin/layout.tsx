@@ -11,6 +11,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     { href: "/admin/upload", label: t.nav2.upload, show: can.manageStudents },
     { href: "/admin/students", label: t.nav2.students, show: can.manageStudents },
     { href: "/admin/courses", label: t.nav2.courses, show: can.manageStudents },
+    { href: "/admin/catalogue", label: t.catalogue.tab, show: can.adminArea },
     { href: "/admin/people", label: t.nav2.people, show: can.adminArea },
     { href: "/admin/structure", label: t.lmd.nav.structure, show: can.adminArea },
     { href: "/admin/requests", label: t.nav2.requests, show: can.adminArea },

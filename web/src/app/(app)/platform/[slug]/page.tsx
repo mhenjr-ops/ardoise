@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChevronDown, Pencil } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import { getSession } from "@/lib/session";
 import { errorText, getI18n } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/messages-engage";
@@ -48,6 +48,11 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
   const { data: school } = await supabase.from("institutions").select("id, name, slug, default_locale, status, structure_source, structure_confirmed_at, short_name, brand_color, logo_path, city, website, transcript_template")
     .eq("slug", slug).maybeSingle();
   if (!school) notFound();
+  const { count: catalogueCount } = await supabase
+    .from("catalogue_courses")
+    .select("id", { count: "exact", head: true })
+    .eq("institution_id", school.id)
+    .is("retired_at", null);
 
   const [structure, { data: reqs }, { data: allStats }, { data: office }, { data: links }, origin, { data: reviewRows }, { data: answerRows }] = await Promise.all([
     loadStructure(supabase, school.id),
@@ -282,6 +287,19 @@ export default async function PlatformSchoolPage({ params, searchParams }: PageP
         </div>
 
         <div className="space-y-6">
+          <Link
+            href={`/platform/${school.slug}/catalogue`}
+            className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-slate-200 bg-paper px-5 py-4 hover:border-ardoise"
+          >
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 font-semibold text-slate-900">
+                <BookOpen size={17} className="text-brand-500" aria-hidden />
+                {t.catalogue.consoleLink}
+              </span>
+              <span className="mt-0.5 block text-[13.5px] text-slate-600">{fmt(t.catalogue.consoleHelp, { n: catalogueCount ?? 0 })}</span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-slate-400" aria-hidden />
+          </Link>
           <Card id="status" className="scroll-mt-6">
             <CardHeader
               title={t.prospects.status}
